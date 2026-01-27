@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <style>
@@ -60,7 +61,7 @@
             transition: background 0.25s;
         }
 
-        .toggle input:checked + .toggle-track {
+        .toggle input:checked+.toggle-track {
             background: #4CAF50;
         }
 
@@ -73,10 +74,10 @@
             background: #fff;
             border-radius: 50%;
             transition: transform 0.25s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
-        .toggle input:checked ~ .toggle-thumb {
+        .toggle input:checked~.toggle-thumb {
             transform: translateX(22px);
         }
 
@@ -109,7 +110,7 @@
             width: 100%;
             padding: 10px 6px;
             border: 2px solid #3a3a5a;
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             color: #ccc;
             border-radius: 8px;
             cursor: pointer;
@@ -121,7 +122,7 @@
 
         .preset-btn:hover {
             border-color: #5a5a8a;
-            background: rgba(255,255,255,0.08);
+            background: rgba(255, 255, 255, 0.08);
             color: #fff;
         }
 
@@ -219,7 +220,7 @@
             border: 2px solid #4CAF50;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
             transition: transform 0.15s;
         }
 
@@ -234,13 +235,85 @@
             border: 2px solid #4CAF50;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
         input[type="range"]::-moz-range-track {
             background: #2a2a4a;
             height: 6px;
             border-radius: 3px;
+        }
+
+        /* Select Dropdown */
+        .control-select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #2a2a4a;
+            border: 2px solid #3a3a5a;
+            border-radius: 6px;
+            color: #e8e8e8;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 30px;
+        }
+
+        .control-select:hover {
+            border-color: #5a5a8a;
+        }
+
+        .control-select:focus {
+            border-color: #4CAF50;
+        }
+
+        .control-select:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .control-select option {
+            background: #2a2a4a;
+            color: #e8e8e8;
+            padding: 8px;
+        }
+
+        /* Sub-control (indented, for warmth mode) */
+        .control.sub-control {
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 2px solid #3a3a5a;
+            margin-bottom: 14px;
+            transition: opacity 0.2s;
+        }
+
+        .control.sub-control.disabled {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .control.sub-control .control-label {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        /* Mode indicator badge */
+        .mode-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: rgba(76, 175, 80, 0.2);
+            border-radius: 4px;
+            font-size: 9px;
+            color: #4CAF50;
+            margin-left: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         /* Footer info */
@@ -252,6 +325,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <!-- Header with Toggle -->
@@ -333,6 +407,20 @@
             <input type="range" id="warmth" min="-30" max="30" value="0">
         </div>
 
+        <!-- Warmth Mode Sub-control -->
+        <div class="control sub-control" id="warmth-mode-container">
+            <div class="control-header">
+                <span class="control-label">
+                    Warmth Style
+                    <span class="mode-badge" id="warmth-mode-badge">Simple</span>
+                </span>
+            </div>
+            <select class="control-select" id="warmthMode">
+                <option value="simple">Simple — Uniform color shift</option>
+                <option value="cinematic">Cinematic — Warm highlights, cool shadows</option>
+            </select>
+        </div>
+
         <div class="control">
             <div class="control-header">
                 <span class="control-label">Intensity</span>
@@ -340,10 +428,19 @@
             </div>
             <input type="range" id="intensity" min="0" max="100" value="100">
         </div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Sharpness</span>
+                <span class="control-value" id="sharpness-value">0%</span>
+            </div>
+            <input type="range" id="sharpness" min="0" max="100" value="0">
+        </div>
     </div>
 
     <div class="footer">Changes apply instantly to videos</div>
 
     <script src="popup.js"></script>
 </body>
+
 </html>
