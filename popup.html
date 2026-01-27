@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            width: 300px;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+            color: #e8e8e8;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title::before {
+            content: "🎬";
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            cursor: pointer;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: #3a3a5a;
+            border-radius: 26px;
+            transition: background 0.25s;
+        }
+
+        .toggle input:checked + .toggle-track {
+            background: #4CAF50;
+        }
+
+        .toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.25s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .toggle input:checked ~ .toggle-thumb {
+            transform: translateX(22px);
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 16px;
+        }
+
+        .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        /* Preset Grid */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        /* Preset Item Container */
+        .preset-item {
+            position: relative;
+        }
+
+        .preset-btn {
+            width: 100%;
+            padding: 10px 6px;
+            border: 2px solid #3a3a5a;
+            background: rgba(255,255,255,0.03);
+            color: #ccc;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .preset-btn:hover {
+            border-color: #5a5a8a;
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
+        .preset-btn.active {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.15);
+            color: #4CAF50;
+            box-shadow: 0 0 12px rgba(76, 175, 80, 0.3);
+        }
+
+        /* Reset button for individual preset */
+        .preset-reset {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            border: none;
+            border-radius: 50%;
+            background: #ff9800;
+            color: #fff;
+            font-size: 12px;
+            line-height: 18px;
+            text-align: center;
+            cursor: pointer;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.2s;
+            z-index: 10;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preset-reset:hover {
+            background: #f57c00;
+            transform: scale(1.1);
+        }
+
+        /* Show reset button when preset is modified */
+        .preset-item.modified .preset-reset {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #3a3a5a, transparent);
+            margin: 16px 0;
+        }
+
+        /* Slider Control */
+        .control {
+            margin-bottom: 14px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: #ccc;
+        }
+
+        .control-value {
+            font-size: 12px;
+            font-family: 'SF Mono', Monaco, monospace;
+            color: #4CAF50;
+            min-width: 45px;
+            text-align: right;
+        }
+
+        /* Range Slider */
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #2a2a4a;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(145deg, #5a5a8a, #4a4a7a);
+            border: 2px solid #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(145deg, #5a5a8a, #4a4a7a);
+            border: 2px solid #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        input[type="range"]::-moz-range-track {
+            background: #2a2a4a;
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        /* Footer info */
+        .footer {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 10px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header with Toggle -->
+    <div class="header">
+        <div class="title">Video Enhancer</div>
+        <label class="toggle">
+            <input type="checkbox" id="enabled-toggle">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+        </label>
+    </div>
+
+    <!-- Presets Section -->
+    <div class="section">
+        <div class="section-label">Presets</div>
+        <div class="preset-grid">
+            <div class="preset-item" data-preset="subtle">
+                <button class="preset-btn">Subtle</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+            <div class="preset-item" data-preset="balanced">
+                <button class="preset-btn">Balanced</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+            <div class="preset-item" data-preset="vivid">
+                <button class="preset-btn">Vivid</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+            <div class="preset-item" data-preset="cinema">
+                <button class="preset-btn">Cinema</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+            <div class="preset-item" data-preset="gaming">
+                <button class="preset-btn">Gaming</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+            <div class="preset-item" data-preset="warm">
+                <button class="preset-btn">Warm</button>
+                <button class="preset-reset" title="Reset to default">↺</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Sliders Section -->
+    <div class="section">
+        <div class="section-label">Adjustments</div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Brightness</span>
+                <span class="control-value" id="brightness-value">100%</span>
+            </div>
+            <input type="range" id="brightness" min="50" max="150" value="100">
+        </div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Contrast</span>
+                <span class="control-value" id="contrast-value">100%</span>
+            </div>
+            <input type="range" id="contrast" min="50" max="200" value="100">
+        </div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Saturation</span>
+                <span class="control-value" id="saturate-value">100%</span>
+            </div>
+            <input type="range" id="saturate" min="50" max="200" value="100">
+        </div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Warmth</span>
+                <span class="control-value" id="warmth-value">0°</span>
+            </div>
+            <input type="range" id="warmth" min="-30" max="30" value="0">
+        </div>
+
+        <div class="control">
+            <div class="control-header">
+                <span class="control-label">Intensity</span>
+                <span class="control-value" id="intensity-value">100%</span>
+            </div>
+            <input type="range" id="intensity" min="0" max="100" value="100">
+        </div>
+    </div>
+
+    <div class="footer">Changes apply instantly to videos</div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
