@@ -6,25 +6,89 @@
  *   enabled: boolean,
  *   activePreset: string,
  *   presets: {
- *     [presetName]: { brightness, contrast, saturate, warmth, intensity }
+ *     [presetName]: { brightness, contrast, saturate, warmth, warmthMode, intensity, sharpness }
  *   }
  * }
  */
 
+// ============================================================
+// Constants
+// ============================================================
+
+const WARMTH_MODE = Object.freeze({
+  SIMPLE: 'simple',
+  CINEMATIC: 'cinematic'
+});
+
 // Factory default values for each preset
 const FACTORY_DEFAULTS = {
-  subtle:   { brightness: 102, contrast: 108, saturate: 110, warmth: 0, intensity: 100 },
-  balanced: { brightness: 105, contrast: 115, saturate: 120, warmth: 0, intensity: 100 },
-  vivid:    { brightness: 108, contrast: 125, saturate: 140, warmth: 0, intensity: 100 },
-  cinema:   { brightness: 100, contrast: 120, saturate: 115, warmth: 10, intensity: 100 },
-  gaming:   { brightness: 110, contrast: 130, saturate: 135, warmth: -5, intensity: 100 },
-  warm:     { brightness: 105, contrast: 110, saturate: 115, warmth: 20, intensity: 100 }
+  subtle: {
+    brightness: 102,
+    contrast: 108,
+    saturate: 110,
+    warmth: 0,
+    warmthMode: WARMTH_MODE.SIMPLE,
+    intensity: 100,
+    sharpness: 0
+  },
+  balanced: {
+    brightness: 105,
+    contrast: 115,
+    saturate: 120,
+    warmth: 0,
+    warmthMode: WARMTH_MODE.SIMPLE,
+    intensity: 100,
+    sharpness: 0
+  },
+  vivid: {
+    brightness: 108,
+    contrast: 125,
+    saturate: 140,
+    warmth: 0,
+    warmthMode: WARMTH_MODE.SIMPLE,
+    intensity: 100,
+    sharpness: 0
+  },
+  cinema: {
+    brightness: 100,
+    contrast: 120,
+    saturate: 115,
+    warmth: 15,
+    warmthMode: WARMTH_MODE.CINEMATIC,
+    intensity: 100,
+    sharpness: 0
+  },
+  gaming: {
+    brightness: 110,
+    contrast: 130,
+    saturate: 135,
+    warmth: -5,
+    warmthMode: WARMTH_MODE.SIMPLE,
+    intensity: 100,
+    sharpness: 0
+  },
+  warm: {
+    brightness: 105,
+    contrast: 110,
+    saturate: 115,
+    warmth: 25,
+    warmthMode: WARMTH_MODE.CINEMATIC,
+    intensity: 100,
+    sharpness: 0
+  }
 };
 
-const SLIDER_KEYS = ['brightness', 'contrast', 'saturate', 'warmth', 'intensity'];
+// Control keys
+const SLIDER_KEYS = ['brightness', 'contrast', 'saturate', 'warmth', 'intensity', 'sharpness'];
+const SELECT_KEYS = ['warmthMode'];
+const ALL_SETTING_KEYS = [...SLIDER_KEYS, ...SELECT_KEYS];
+
 const DEFAULT_ACTIVE_PRESET = 'balanced';
 
-// Current state
+// ============================================================
+// State
+// ============================================================
+
 let state = {
   enabled: true,
   activePreset: DEFAULT_ACTIVE_PRESET,
@@ -44,7 +108,7 @@ function isPresetModified(presetName) {
   const factory = FACTORY_DEFAULTS[presetName];
   if (!current || !factory) return false;
 
-  return SLIDER_KEYS.some(key => current[key] !== factory[key]);
+  return ALL_SETTING_KEYS.some(key => current[key] !== factory[key]);
 }
 
 // ============================================================
@@ -59,6 +123,11 @@ async function loadState() {
     state.enabled = stored.enabled !== undefined ? stored.enabled : true;
     state.activePreset = stored.activePreset || DEFAULT_ACTIVE_PRESET;
 
+    // Validate active preset exists
+    if (!FACTORY_DEFAULTS[state.activePreset]) {
+      state.activePreset = DEFAULT_ACTIVE_PRESET;
+    }
+
     // Load presets - merge stored with factory defaults
     if (stored.presets) {
       state.presets = {};
@@ -67,6 +136,11 @@ async function loadState() {
           ...FACTORY_DEFAULTS[presetName],
           ...stored.presets[presetName]
         };
+
+        // Validate warmthMode
+        if (!Object.values(WARMTH_MODE).includes(state.presets[presetName].warmthMode)) {
+          state.presets[presetName].warmthMode = FACTORY_DEFAULTS[presetName].warmthMode;
+        }
       }
     } else {
       state.presets = deepClone(FACTORY_DEFAULTS);
@@ -95,7 +169,9 @@ function saveState() {
 
 function updateToggleUI() {
   const toggle = document.getElementById('enabled-toggle');
-  toggle.checked = state.enabled;
+  if (toggle) {
+    toggle.checked = state.enabled;
+  }
 }
 
 function updatePresetButtonsUI() {
@@ -105,19 +181,13 @@ function updatePresetButtonsUI() {
     const presetName = item.dataset.preset;
     const btn = item.querySelector('.preset-btn');
 
+    if (!btn) return;
+
     // Active state
-    if (presetName === state.activePreset) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+    btn.classList.toggle('active', presetName === state.activePreset);
 
     // Modified indicator (shows reset button)
-    if (isPresetModified(presetName)) {
-      item.classList.add('modified');
-    } else {
-      item.classList.remove('modified');
-    }
+    item.classList.toggle('modified', isPresetModified(presetName));
   });
 }
 
@@ -136,13 +206,59 @@ function updateSlidersUI() {
   });
 }
 
+function updateSelectsUI() {
+  const activeValues = state.presets[state.activePreset];
+  if (!activeValues) return;
+
+  SELECT_KEYS.forEach(key => {
+    const select = document.getElementById(key);
+    if (select && activeValues[key] !== undefined) {
+      select.value = activeValues[key];
+    }
+  });
+
+  // Update warmth mode state
+  updateWarmthModeState();
+}
+
+function updateWarmthModeState() {
+  const activeValues = state.presets[state.activePreset];
+  const warmthModeSelect = document.getElementById('warmthMode');
+  const warmthModeContainer = document.getElementById('warmth-mode-container');
+  const warmthModeBadge = document.getElementById('warmth-mode-badge');
+
+  if (!warmthModeSelect || !activeValues) return;
+
+  // Check if warmth is active
+  const warmthValue = activeValues.warmth || 0;
+  const isWarmthActive = Math.abs(warmthValue) > 0;
+
+  // Enable/disable based on warmth value
+  if (warmthModeContainer) {
+    warmthModeContainer.classList.toggle('disabled', !isWarmthActive);
+  }
+  warmthModeSelect.disabled = !isWarmthActive;
+
+  // Update badge text
+  if (warmthModeBadge) {
+    const modeText = activeValues.warmthMode === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
+    warmthModeBadge.textContent = isWarmthActive ? modeText : 'Inactive';
+  }
+}
+
 function updateValueDisplay(key, value, element) {
   if (!element) return;
 
-  if (key === 'warmth') {
-    element.textContent = `${value}°`;
-  } else {
-    element.textContent = `${value}%`;
+  switch (key) {
+    case 'warmth':
+      const sign = value > 0 ? '+' : '';
+      element.textContent = `${sign}${value}°`;
+      break;
+    case 'sharpness':
+      element.textContent = value === 0 ? 'Off' : `${value}%`;
+      break;
+    default:
+      element.textContent = `${value}%`;
   }
 }
 
@@ -150,6 +266,7 @@ function updateAllUI() {
   updateToggleUI();
   updatePresetButtonsUI();
   updateSlidersUI();
+  updateSelectsUI();
 }
 
 // ============================================================
@@ -162,7 +279,6 @@ function handleToggleChange(e) {
 }
 
 function handlePresetClick(e) {
-  // Find the preset item container
   const item = e.target.closest('.preset-item');
   if (!item) return;
 
@@ -175,6 +291,7 @@ function handlePresetClick(e) {
   // Update UI to reflect new preset's values
   updatePresetButtonsUI();
   updateSlidersUI();
+  updateSelectsUI();
 
   // Save state
   saveState();
@@ -184,12 +301,11 @@ function handlePresetReset(e) {
   // Stop event from bubbling to preset button
   e.stopPropagation();
 
-  // Find the preset item container
   const item = e.target.closest('.preset-item');
   if (!item) return;
 
   const presetName = item.dataset.preset;
-  if (!presetName) return;
+  if (!presetName || !FACTORY_DEFAULTS[presetName]) return;
 
   // Reset this preset to factory defaults
   state.presets[presetName] = deepClone(FACTORY_DEFAULTS[presetName]);
@@ -197,9 +313,10 @@ function handlePresetReset(e) {
   // Update UI
   updatePresetButtonsUI();
 
-  // If this is the active preset, also update sliders
+  // If this is the active preset, also update sliders and selects
   if (presetName === state.activePreset) {
     updateSlidersUI();
+    updateSelectsUI();
   }
 
   // Save state
@@ -222,6 +339,35 @@ function handleSliderInput(e) {
   // Update modified indicator on preset button
   updatePresetButtonsUI();
 
+  // Special handling for warmth slider
+  if (key === 'warmth') {
+    updateWarmthModeState();
+  }
+
+  // Save state
+  saveState();
+}
+
+function handleSelectChange(e) {
+  const key = e.target.id;
+  const value = e.target.value;
+
+  // Update active preset's value
+  if (state.presets[state.activePreset]) {
+    state.presets[state.activePreset][key] = value;
+  }
+
+  // Update badge for warmth mode
+  if (key === 'warmthMode') {
+    const badge = document.getElementById('warmth-mode-badge');
+    if (badge) {
+      badge.textContent = value === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
+    }
+  }
+
+  // Update modified indicator on preset button
+  updatePresetButtonsUI();
+
   // Save state
   saveState();
 }
@@ -232,7 +378,10 @@ function handleSliderInput(e) {
 
 function attachEventListeners() {
   // Toggle
-  document.getElementById('enabled-toggle').addEventListener('change', handleToggleChange);
+  const toggle = document.getElementById('enabled-toggle');
+  if (toggle) {
+    toggle.addEventListener('change', handleToggleChange);
+  }
 
   // Preset buttons
   document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -249,6 +398,14 @@ function attachEventListeners() {
     const slider = document.getElementById(key);
     if (slider) {
       slider.addEventListener('input', handleSliderInput);
+    }
+  });
+
+  // Selects
+  SELECT_KEYS.forEach(key => {
+    const select = document.getElementById(key);
+    if (select) {
+      select.addEventListener('change', handleSelectChange);
     }
   });
 }
