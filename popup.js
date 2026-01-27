@@ -1,5 +1,4 @@
 /**
- * Fake HDR Extension - Popup Controller
  *
  * Data Model:
  * {
