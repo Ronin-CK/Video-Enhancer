@@ -15,21 +15,6 @@
 
 </div>
 
-## 📋 Table of Contents
-
-- [About](#-about)
-- [Features](#-features)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [How It Works](#-how-it-works)
-- [Screenshots](#-screenshots)
-- [Browser Support](#-browser-support)
-- [Permissions](#-permissions)
-- [Known Limitations](#-known-limitations)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
 
 ## 🎯 About
 
