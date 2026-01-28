@@ -23,7 +23,7 @@ Video Enhancer applies **real-time CSS filter adjustments** to videos, boosting 
 > 💡 Think of it as a **smart color enhancer**, not true HDR. No metadata processing, no decoding changes, no GPU trickery.
 
 Perfect for:
-- 📺 LCD monitors without HDR support
+- 📺 LED monitors without HDR support
 - 🎥 Enhancing washed-out streaming content
 - 🎮 Adding vibrancy to gameplay footage
 - 🎬 Customizing video appearance to your preference
