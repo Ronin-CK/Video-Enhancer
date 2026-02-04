@@ -326,7 +326,7 @@ function removeFilters() {
     state.currentFilterId = null;
 }
 
-function getHostname() { return window.location.hostname; }
+function getHostname() { return window.location.hostname.replace(/^www\./, ''); }
 
 function resolveSettings(data) {
     const hostname = getHostname();
