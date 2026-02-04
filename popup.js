@@ -51,7 +51,9 @@ async function getCurrentHostname() {
   if (tab?.url) {
     try {
       const url = new URL(tab.url);
-      if (url.protocol.startsWith('http')) return url.hostname;
+      if (url.protocol.startsWith('http')) {
+        return url.hostname.replace(/^www\./, '');
+      }
     } catch (e) { console.error(e); }
   }
   return null;
@@ -76,6 +78,12 @@ async function loadState() {
       activePreset: state.activePreset,
       presets: deepClone(state.presets)
     };
+
+    // Auto-switch to site scope if settings exist for this host
+    if (hostname && state.siteSettings[hostname]) {
+      state.scope = 'site';
+      loadSettingsFromData(state.siteSettings[hostname]);
+    }
 
     const siteTab = document.getElementById('tab-site');
     if (siteTab) {
