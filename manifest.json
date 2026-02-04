@@ -1,8 +1,8 @@
 {
     "manifest_version": 2,
     "name": "Video Enhancer",
-    "version": "2.1.0",
-    "description": "Enhance video colors with fake HDR effects for LCD displays",
+    "version": "2.2.0",
+    "description": "Enhance video colors with fake HDR effects",
     "browser_specific_settings": {
         "gecko": {
             "id": "video-controller@ronin-ck.com",
@@ -16,12 +16,18 @@
     },
     "permissions": [
         "storage",
-        "<all_urls>"
+        "<all_urls>",
+        "activeTab"
     ],
+    "background": {
+        "scripts": [
+            "background.js"
+        ]
+    },
     "browser_action": {
         "default_popup": "popup.html",
         "default_icon": "icon.svg",
-        "default_title": "Fake HDR Settings"
+        "default_title": "Video Enhancer"
     },
     "content_scripts": [
         {
