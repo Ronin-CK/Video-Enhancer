@@ -1,80 +1,22 @@
-// -----------------------------------------------------------------------------
-// Constants
-// -----------------------------------------------------------------------------
-
 const STYLE_ID = 'firefox-hdr-optimizer-style';
 const SVG_FILTER_ID = 'video-enhancer-filter';
 const SVG_CONTAINER_ID = 'video-enhancer-svg-container';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
-
 const DEBOUNCE_DELAY = 100;
 
-const WARMTH_MODE = Object.freeze({
+const WARMTH_MODE = {
     SIMPLE: 'simple',
     CINEMATIC: 'cinematic'
-});
+};
 
-// Factory default presets
-const PRESET_DEFAULTS = Object.freeze({
-    subtle: {
-        brightness: 102,
-        contrast: 108,
-        saturate: 110,
-        warmth: 0,
-        warmthMode: WARMTH_MODE.SIMPLE,
-        intensity: 100,
-        sharpness: 0
-    },
-    balanced: {
-        brightness: 105,
-        contrast: 115,
-        saturate: 120,
-        warmth: 0,
-        warmthMode: WARMTH_MODE.SIMPLE,
-        intensity: 100,
-        sharpness: 0
-    },
-    vivid: {
-        brightness: 108,
-        contrast: 125,
-        saturate: 140,
-        warmth: 0,
-        warmthMode: WARMTH_MODE.SIMPLE,
-        intensity: 100,
-        sharpness: 0
-    },
-    cinema: {
-        brightness: 100,
-        contrast: 120,
-        saturate: 115,
-        warmth: 15,
-        warmthMode: WARMTH_MODE.CINEMATIC,
-        intensity: 100,
-        sharpness: 0
-    },
-    gaming: {
-        brightness: 110,
-        contrast: 130,
-        saturate: 135,
-        warmth: -5,
-        warmthMode: WARMTH_MODE.SIMPLE,
-        intensity: 100,
-        sharpness: 0
-    },
-    warm: {
-        brightness: 105,
-        contrast: 110,
-        saturate: 115,
-        warmth: 25,
-        warmthMode: WARMTH_MODE.CINEMATIC,
-        intensity: 100,
-        sharpness: 0
-    }
-});
-
-// -----------------------------------------------------------------------------
-// State Management
-// -----------------------------------------------------------------------------
+const PRESET_DEFAULTS = {
+    subtle: { brightness: 102, contrast: 108, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+    balanced: { brightness: 105, contrast: 115, saturate: 120, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+    vivid: { brightness: 108, contrast: 125, saturate: 140, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+    cinema: { brightness: 100, contrast: 120, saturate: 115, warmth: 15, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 },
+    gaming: { brightness: 110, contrast: 130, saturate: 135, warmth: -5, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+    warm: { brightness: 105, contrast: 110, saturate: 115, warmth: 25, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 }
+};
 
 const state = {
     currentSharpness: null,
@@ -84,20 +26,12 @@ const state = {
     isInitialized: false
 };
 
-// -----------------------------------------------------------------------------
-// Utility Functions
-// -----------------------------------------------------------------------------
-
 function debounce(fn, delay) {
     let timerId = null;
-    return function debounced(...args) {
+    return function (...args) {
         clearTimeout(timerId);
         timerId = setTimeout(() => fn.apply(this, args), delay);
     };
-}
-
-function handleError(context, error) {
-    console.error(`[Video Enhancer] ${context}:`, error);
 }
 
 function getNumericValue(value, fallback) {
@@ -109,13 +43,8 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-// -----------------------------------------------------------------------------
-// SVG Filter Creation Helpers
-// -----------------------------------------------------------------------------
-
 function createSharpnessElements(sharpness, inputName, outputName) {
     const fragment = document.createDocumentFragment();
-
     const strength = (sharpness / 100) * 3;
     const k2 = 1 + strength;
     const k3 = -strength;
@@ -141,7 +70,6 @@ function createSharpnessElements(sharpness, inputName, outputName) {
 
 function createSimpleWarmthElement(warmth, inputName, outputName) {
     const w = warmth / 100;
-
     const r = 1 + (w * 0.15);
     const g = 1 + (w * 0.05);
     const b = 1 - (w * 0.15);
@@ -166,7 +94,7 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     const fragment = document.createDocumentFragment();
     const w = warmth / 100;
 
-    // Stage 1: Gamma-based tonal separation
+    // 1. Tonal Separation: Push warmth into midtones/highlights, cool down shadows
     const gammaTransfer = document.createElementNS(SVG_NAMESPACE, 'feComponentTransfer');
     gammaTransfer.setAttribute('in', inputName);
     gammaTransfer.setAttribute('result', 'gammaCorrected');
@@ -176,6 +104,7 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     funcR.setAttribute('amplitude', (1 + w * 0.12).toFixed(4));
     funcR.setAttribute('exponent', (1 - w * 0.08).toFixed(4));
     funcR.setAttribute('offset', (w * 0.01).toFixed(4));
+
 
     const funcG = document.createElementNS(SVG_NAMESPACE, 'feFuncG');
     funcG.setAttribute('type', 'gamma');
@@ -230,7 +159,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     ].join(' '));
 
     fragment.appendChild(finalGrade);
-
     return fragment;
 }
 
@@ -259,20 +187,13 @@ function createCombinedFilterSVG(filterId, sharpness, warmth, warmthMode) {
     let currentInput = 'SourceGraphic';
     let stepCount = 0;
 
-    // Apply warmth first
     if (Math.abs(warmth) > 0.5) {
         const outputName = `step${++stepCount}`;
         const warmthElements = createWarmthElements(warmth, warmthMode, currentInput, outputName);
-
-        if (warmthElements instanceof DocumentFragment) {
-            filter.appendChild(warmthElements);
-        } else {
-            filter.appendChild(warmthElements);
-        }
+        filter.appendChild(warmthElements);
         currentInput = outputName;
     }
 
-    // Apply sharpness second
     if (sharpness > 0) {
         const outputName = `step${++stepCount}`;
         const sharpnessElements = createSharpnessElements(sharpness, currentInput, outputName);
@@ -283,24 +204,15 @@ function createCombinedFilterSVG(filterId, sharpness, warmth, warmthMode) {
     return svg;
 }
 
-// -----------------------------------------------------------------------------
-// SVG Filter Management
-// -----------------------------------------------------------------------------
-
 function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
-    const normalizedSharpness = clamp(Math.round(sharpness), 0, 100);
-    const normalizedWarmth = clamp(warmth, -100, 100);
-    const normalizedMode = warmthMode === WARMTH_MODE.CINEMATIC
-        ? WARMTH_MODE.CINEMATIC
-        : WARMTH_MODE.SIMPLE;
+    const normSharpness = clamp(Math.round(sharpness), 0, 100);
+    const normWarmth = clamp(warmth, -100, 100);
+    const normMode = warmthMode === WARMTH_MODE.CINEMATIC ? WARMTH_MODE.CINEMATIC : WARMTH_MODE.SIMPLE;
+    const needsFilter = normSharpness > 0 || Math.abs(normWarmth) > 0.5;
 
-    const needsFilter = normalizedSharpness > 0 || Math.abs(normalizedWarmth) > 0.5;
-
-    if (
-        normalizedSharpness === state.currentSharpness &&
-        normalizedWarmth === state.currentWarmth &&
-        normalizedMode === state.currentWarmthMode
-    ) {
+    if (normSharpness === state.currentSharpness &&
+        normWarmth === state.currentWarmth &&
+        normMode === state.currentWarmthMode) {
         return state.currentFilterId;
     }
 
@@ -317,7 +229,7 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
 
     if (!document.body) {
         document.addEventListener('DOMContentLoaded', () => {
-            updateSVGFilter(normalizedSharpness, normalizedWarmth, normalizedMode);
+            updateSVGFilter(normSharpness, normWarmth, normMode);
             loadAndApplySettings();
         }, { once: true });
         return null;
@@ -326,32 +238,26 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
     if (!container) {
         container = document.createElement('div');
         container.id = SVG_CONTAINER_ID;
-        container.style.cssText =
-            'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;visibility:hidden;';
+        container.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;visibility:hidden;';
         document.body.appendChild(container);
     }
 
-    const modePrefix = normalizedMode === WARMTH_MODE.CINEMATIC ? 'c' : 's';
-    const filterId = `${SVG_FILTER_ID}-${modePrefix}${normalizedWarmth.toFixed(0)}-sh${normalizedSharpness}`;
+    const modePrefix = normMode === WARMTH_MODE.CINEMATIC ? 'c' : 's';
+    const filterId = `${SVG_FILTER_ID}-${modePrefix}${normWarmth.toFixed(0)}-sh${normSharpness}`;
+    const svg = createCombinedFilterSVG(filterId, normSharpness, normWarmth, normMode);
 
-    const svg = createCombinedFilterSVG(filterId, normalizedSharpness, normalizedWarmth, normalizedMode);
     container.replaceChildren(svg);
 
-    state.currentSharpness = normalizedSharpness;
-    state.currentWarmth = normalizedWarmth;
-    state.currentWarmthMode = normalizedMode;
+    state.currentSharpness = normSharpness;
+    state.currentWarmth = normWarmth;
+    state.currentWarmthMode = normMode;
     state.currentFilterId = filterId;
 
     return filterId;
 }
 
-// -----------------------------------------------------------------------------
-// CSS Filter Management
-// -----------------------------------------------------------------------------
-
 function buildFilterString(values, svgFilterId) {
     const intensity = getNumericValue(values.intensity, 100) / 100;
-
     const brightness = 100 + (getNumericValue(values.brightness, 100) - 100) * intensity;
     const contrast = 100 + (getNumericValue(values.contrast, 100) - 100) * intensity;
     const saturate = 100 + (getNumericValue(values.saturate, 100) - 100) * intensity;
@@ -362,16 +268,12 @@ function buildFilterString(values, svgFilterId) {
         `saturate(${saturate.toFixed(2)}%)`
     ];
 
-    if (svgFilterId) {
-        filters.push(`url(#${svgFilterId})`);
-    }
-
+    if (svgFilterId) filters.push(`url(#${svgFilterId})`);
     return filters.join(' ');
 }
 
 function updateStyleElement(filterValue) {
     let style = document.getElementById(STYLE_ID);
-
     if (!style) {
         style = document.createElement('style');
         style.id = STYLE_ID;
@@ -379,34 +281,17 @@ function updateStyleElement(filterValue) {
     }
 
     style.textContent = `
-        video,
-        .html5-main-video,
-        .video-stream,
-        .html5-video-player video,
-        [class*="player"] video,
-        [data-player] video {
+        video, .html5-main-video, .video-stream, .html5-video-player video,
+        [class*="player"] video, [data-player] video {
             filter: ${filterValue} !important;
         }
-
-        img,
-        picture,
-        svg:not(#${SVG_CONTAINER_ID} svg),
-        [role="img"],
-        ytd-thumbnail,
-        .ytp-videowall-still-image,
-        yt-image,
-        yt-img-shadow,
-        .thumbnail,
-        [class*="thumbnail"],
-        [class*="poster"] {
+        img, picture, svg:not(#${SVG_CONTAINER_ID} svg), [role="img"],
+        ytd-thumbnail, .ytp-videowall-still-image, yt-image, yt-img-shadow,
+        .thumbnail, [class*="thumbnail"], [class*="poster"] {
             filter: none !important;
         }
     `;
 }
-
-// -----------------------------------------------------------------------------
-// Core Filter Application
-// -----------------------------------------------------------------------------
 
 function applyFilters(data) {
     try {
@@ -415,9 +300,8 @@ function applyFilters(data) {
             return;
         }
 
-        const activePresetName = data.activePreset || 'balanced';
         const presets = data.presets || PRESET_DEFAULTS;
-        const activeValues = presets[activePresetName] || PRESET_DEFAULTS.balanced;
+        const activeValues = presets[data.activePreset || 'balanced'] || PRESET_DEFAULTS.balanced;
 
         const intensity = getNumericValue(activeValues.intensity, 100) / 100;
         const sharpness = parseInt(activeValues.sharpness ?? 0, 10);
@@ -425,97 +309,65 @@ function applyFilters(data) {
         const warmthMode = activeValues.warmthMode || WARMTH_MODE.SIMPLE;
 
         const svgFilterId = updateSVGFilter(sharpness, warmth, warmthMode);
-        const filterValue = buildFilterString(activeValues, svgFilterId);
-        updateStyleElement(filterValue);
+        updateStyleElement(buildFilterString(activeValues, svgFilterId));
 
         state.isInitialized = true;
     } catch (error) {
-        handleError('applyFilters', error);
+        console.error('Video Enhancer Apply Error:', error);
     }
 }
 
 function removeFilters() {
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(SVG_CONTAINER_ID)?.remove();
-
     state.currentSharpness = null;
     state.currentWarmth = null;
     state.currentWarmthMode = null;
     state.currentFilterId = null;
 }
 
-// -----------------------------------------------------------------------------
-// Settings Management
-// -----------------------------------------------------------------------------
-
-
-function getHostname() {
-    return window.location.hostname;
-}
+function getHostname() { return window.location.hostname; }
 
 function resolveSettings(data) {
     const hostname = getHostname();
-
-    // Check for site-specific settings
     if (data.siteSettings && data.siteSettings[hostname]) {
         return {
             ...data.siteSettings[hostname],
             presets: data.siteSettings[hostname].presets || data.presets || PRESET_DEFAULTS
         };
     }
-
-    // Fall back to global settings (root)
     return data;
 }
 
 function loadAndApplySettings() {
     browser.storage.local.get(null)
-        .then((data) => {
-            const settings = resolveSettings(data);
-            applyFilters(settings);
-        })
+        .then((data) => applyFilters(resolveSettings(data)))
         .catch((error) => {
-            handleError('loadAndApplySettings', error);
-            applyFilters({
-                enabled: true,
-                activePreset: 'balanced',
-                presets: PRESET_DEFAULTS
-            });
+            console.error('Video Enhancer Load Error:', error);
+            applyFilters({ enabled: true, activePreset: 'balanced', presets: PRESET_DEFAULTS });
         });
 }
 
 const debouncedLoadSettings = debounce(loadAndApplySettings, DEBOUNCE_DELAY);
 
-// -----------------------------------------------------------------------------
-// Event Listeners & Observers
-// -----------------------------------------------------------------------------
-
 function initStorageListener() {
     browser.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local') {
-            loadAndApplySettings();
-        }
+        if (area === 'local') loadAndApplySettings();
     });
 
     browser.runtime.onMessage.addListener((message) => {
         if (message.type === 'UPDATE_SETTINGS' && message.settings) {
-         
-            const resolved = resolveSettings(message.settings);
-            applyFilters(resolved);
+            applyFilters(resolveSettings(message.settings));
         }
     });
 }
 
 function initMutationObserver() {
     const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
+        for (const m of mutations) {
+            for (const node of m.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
-
-                const isVideo = node.nodeName === 'VIDEO';
-                const containsVideo = node.querySelector?.('video');
-
-                if (isVideo || containsVideo) {
+                if (node.nodeName === 'VIDEO' || node.querySelector?.('video')) {
                     debouncedLoadSettings();
                     return;
                 }
@@ -524,26 +376,13 @@ function initMutationObserver() {
     });
 
     const startObserving = () => {
-        if (document.body) {
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-        }
+        if (document.body) observer.observe(document.body, { childList: true, subtree: true });
     };
 
-    if (document.body) {
-        startObserving();
-    } else {
-        document.addEventListener('DOMContentLoaded', startObserving, { once: true });
-    }
-
+    if (document.body) startObserving();
+    else document.addEventListener('DOMContentLoaded', startObserving, { once: true });
     return observer;
 }
-
-// -----------------------------------------------------------------------------
-// Initialization
-// -----------------------------------------------------------------------------
 
 function init() {
     loadAndApplySettings();
