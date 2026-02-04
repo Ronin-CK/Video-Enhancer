@@ -448,9 +448,32 @@ function removeFilters() {
 // Settings Management
 // -----------------------------------------------------------------------------
 
+
+function getHostname() {
+    return window.location.hostname;
+}
+
+function resolveSettings(data) {
+    const hostname = getHostname();
+
+    // Check for site-specific settings
+    if (data.siteSettings && data.siteSettings[hostname]) {
+        return {
+            ...data.siteSettings[hostname],
+            presets: data.siteSettings[hostname].presets || data.presets || PRESET_DEFAULTS
+        };
+    }
+
+    // Fall back to global settings (root)
+    return data;
+}
+
 function loadAndApplySettings() {
     browser.storage.local.get(null)
-        .then(applyFilters)
+        .then((data) => {
+            const settings = resolveSettings(data);
+            applyFilters(settings);
+        })
         .catch((error) => {
             handleError('loadAndApplySettings', error);
             applyFilters({
@@ -471,6 +494,14 @@ function initStorageListener() {
     browser.storage.onChanged.addListener((changes, area) => {
         if (area === 'local') {
             loadAndApplySettings();
+        }
+    });
+
+    browser.runtime.onMessage.addListener((message) => {
+        if (message.type === 'UPDATE_SETTINGS' && message.settings) {
+         
+            const resolved = resolveSettings(message.settings);
+            applyFilters(resolved);
         }
     });
 }
