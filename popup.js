@@ -1,276 +1,238 @@
-/**
- *
- * Data Model:
- * {
- *   enabled: boolean,
- *   activePreset: string,
- *   presets: {
- *     [presetName]: { brightness, contrast, saturate, warmth, warmthMode, intensity, sharpness }
- *   }
- * }
- */
-
-// ============================================================
-// Constants
-// ============================================================
-
-const WARMTH_MODE = Object.freeze({
+const WARMTH_MODE = {
   SIMPLE: 'simple',
   CINEMATIC: 'cinematic'
-});
-
-// Factory default values for each preset
-const FACTORY_DEFAULTS = {
-  subtle: {
-    brightness: 102,
-    contrast: 108,
-    saturate: 110,
-    warmth: 0,
-    warmthMode: WARMTH_MODE.SIMPLE,
-    intensity: 100,
-    sharpness: 0
-  },
-  balanced: {
-    brightness: 105,
-    contrast: 115,
-    saturate: 120,
-    warmth: 0,
-    warmthMode: WARMTH_MODE.SIMPLE,
-    intensity: 100,
-    sharpness: 0
-  },
-  vivid: {
-    brightness: 108,
-    contrast: 125,
-    saturate: 140,
-    warmth: 0,
-    warmthMode: WARMTH_MODE.SIMPLE,
-    intensity: 100,
-    sharpness: 0
-  },
-  cinema: {
-    brightness: 100,
-    contrast: 120,
-    saturate: 115,
-    warmth: 15,
-    warmthMode: WARMTH_MODE.CINEMATIC,
-    intensity: 100,
-    sharpness: 0
-  },
-  gaming: {
-    brightness: 110,
-    contrast: 130,
-    saturate: 135,
-    warmth: -5,
-    warmthMode: WARMTH_MODE.SIMPLE,
-    intensity: 100,
-    sharpness: 0
-  },
-  warm: {
-    brightness: 105,
-    contrast: 110,
-    saturate: 115,
-    warmth: 25,
-    warmthMode: WARMTH_MODE.CINEMATIC,
-    intensity: 100,
-    sharpness: 0
-  }
 };
 
-// Control keys
+const FACTORY_DEFAULTS = {
+  subtle: { brightness: 102, contrast: 108, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+  balanced: { brightness: 105, contrast: 115, saturate: 120, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+  vivid: { brightness: 108, contrast: 125, saturate: 140, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+  cinema: { brightness: 100, contrast: 120, saturate: 115, warmth: 15, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 },
+  gaming: { brightness: 110, contrast: 130, saturate: 135, warmth: -5, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
+  warm: { brightness: 105, contrast: 110, saturate: 115, warmth: 25, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 }
+};
+
 const SLIDER_KEYS = ['brightness', 'contrast', 'saturate', 'warmth', 'intensity', 'sharpness'];
 const SELECT_KEYS = ['warmthMode'];
 const ALL_SETTING_KEYS = [...SLIDER_KEYS, ...SELECT_KEYS];
-
 const DEFAULT_ACTIVE_PRESET = 'balanced';
-
-// ============================================================
-// State
-// ============================================================
 
 let state = {
   enabled: true,
   activePreset: DEFAULT_ACTIVE_PRESET,
-  presets: deepClone(FACTORY_DEFAULTS)
+  presets: deepClone(FACTORY_DEFAULTS),
+  scope: 'global', // 'global' | 'site'
+  hostname: null,
+  siteSettings: {},
+  globalSettings: null
 };
-
-// ============================================================
-// Utility Functions
-// ============================================================
 
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
 }
 
 function isPresetModified(presetName) {
   const current = state.presets[presetName];
   const factory = FACTORY_DEFAULTS[presetName];
   if (!current || !factory) return false;
-
   return ALL_SETTING_KEYS.some(key => current[key] !== factory[key]);
 }
 
-// ============================================================
-// Storage Functions
-// ============================================================
+async function getCurrentHostname() {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (tab?.url) {
+    try {
+      const url = new URL(tab.url);
+      if (url.protocol.startsWith('http')) return url.hostname;
+    } catch (e) { console.error(e); }
+  }
+  return null;
+}
 
 async function loadState() {
   try {
-    const stored = await browser.storage.local.get(null);
+    const [stored, hostname] = await Promise.all([
+      browser.storage.local.get(null),
+      getCurrentHostname()
+    ]);
 
-    // Merge stored data with defaults
-    state.enabled = stored.enabled !== undefined ? stored.enabled : true;
-    state.activePreset = stored.activePreset || DEFAULT_ACTIVE_PRESET;
+    state.hostname = hostname;
+    state.siteSettings = stored.siteSettings || {};
 
-    // Validate active preset exists
-    if (!FACTORY_DEFAULTS[state.activePreset]) {
-      state.activePreset = DEFAULT_ACTIVE_PRESET;
-    }
+    // Always load global first to have a baseline
+    loadSettingsFromData(stored);
 
-    // Load presets - merge stored with factory defaults
-    if (stored.presets) {
-      state.presets = {};
-      for (const presetName of Object.keys(FACTORY_DEFAULTS)) {
-        state.presets[presetName] = {
-          ...FACTORY_DEFAULTS[presetName],
-          ...stored.presets[presetName]
-        };
-
-        // Validate warmthMode
-        if (!Object.values(WARMTH_MODE).includes(state.presets[presetName].warmthMode)) {
-          state.presets[presetName].warmthMode = FACTORY_DEFAULTS[presetName].warmthMode;
-        }
-      }
-    } else {
-      state.presets = deepClone(FACTORY_DEFAULTS);
-    }
-  } catch (e) {
-    console.error('Failed to load state:', e);
-    state = {
-      enabled: true,
-      activePreset: DEFAULT_ACTIVE_PRESET,
-      presets: deepClone(FACTORY_DEFAULTS)
+    // Cache global for fast switching back
+    state.globalSettings = {
+      enabled: state.enabled,
+      activePreset: state.activePreset,
+      presets: deepClone(state.presets)
     };
+
+    const siteTab = document.getElementById('tab-site');
+    if (siteTab) {
+      siteTab.textContent = hostname || "No Site";
+      siteTab.disabled = !hostname;
+    }
+
+  } catch (e) {
+    console.error(e);
+    // Fallback defaults
+    state.enabled = true;
+    state.activePreset = DEFAULT_ACTIVE_PRESET;
+    state.presets = deepClone(FACTORY_DEFAULTS);
+  }
+}
+
+function loadSettingsFromData(data) {
+  state.enabled = data.enabled ?? true;
+  state.activePreset = data.activePreset || DEFAULT_ACTIVE_PRESET;
+
+  if (!FACTORY_DEFAULTS[state.activePreset]) {
+    state.activePreset = DEFAULT_ACTIVE_PRESET;
+  }
+
+  if (data.presets) {
+    state.presets = {};
+    for (const name of Object.keys(FACTORY_DEFAULTS)) {
+      state.presets[name] = { ...FACTORY_DEFAULTS[name], ...data.presets[name] };
+      // Sanity check enum
+      if (!Object.values(WARMTH_MODE).includes(state.presets[name].warmthMode)) {
+        state.presets[name].warmthMode = FACTORY_DEFAULTS[name].warmthMode;
+      }
+    }
+  } else {
+    state.presets = deepClone(FACTORY_DEFAULTS);
   }
 }
 
 function saveState() {
-  browser.storage.local.set({
+  const data = {
     enabled: state.enabled,
     activePreset: state.activePreset,
     presets: state.presets
-  }).catch(e => console.error('Failed to save state:', e));
-}
+  };
 
-// ============================================================
-// UI Update Functions
-// ============================================================
-
-function updateToggleUI() {
-  const toggle = document.getElementById('enabled-toggle');
-  if (toggle) {
-    toggle.checked = state.enabled;
+  if (state.scope === 'global') {
+    browser.storage.local.set(data).catch(console.error);
+  } else if (state.scope === 'site' && state.hostname) {
+    state.siteSettings[state.hostname] = data;
+    browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
   }
 }
 
+function switchScope(newScope) {
+  if (newScope === state.scope) return;
+  if (newScope === 'site' && !state.hostname) return;
+
+  state.scope = newScope;
+
+
+  if (newScope === 'site') {
+    const siteData = state.siteSettings[state.hostname];
+    if (siteData) loadSettingsFromData(siteData);
+    // If no site data sucks, we just keep current settings as starting point for this site
+  } else {
+    // Restore cached global settings so we don't lose previous edits
+    if (state.globalSettings) {
+      state.enabled = state.globalSettings.enabled;
+      state.activePreset = state.globalSettings.activePreset;
+      state.presets = deepClone(state.globalSettings.presets);
+    } else {
+      loadState();
+      return;
+    }
+  }
+  updateAllUI();
+}
+
+function updateToggleUI() {
+  const toggle = document.getElementById('enabled-toggle');
+  if (toggle) toggle.checked = state.enabled;
+}
+
 function updatePresetButtonsUI() {
-  const items = document.querySelectorAll('.preset-item');
-
-  items.forEach(item => {
-    const presetName = item.dataset.preset;
+  document.querySelectorAll('.preset-item').forEach(item => {
+    const name = item.dataset.preset;
     const btn = item.querySelector('.preset-btn');
-
     if (!btn) return;
 
-    // Active state
-    btn.classList.toggle('active', presetName === state.activePreset);
-
-    // Modified indicator (shows reset button)
-    item.classList.toggle('modified', isPresetModified(presetName));
+    btn.classList.toggle('active', name === state.activePreset);
+    item.classList.toggle('modified', isPresetModified(name));
   });
 }
 
 function updateSlidersUI() {
-  const activeValues = state.presets[state.activePreset];
-  if (!activeValues) return;
+  const vals = state.presets[state.activePreset];
+  if (!vals) return;
 
   SLIDER_KEYS.forEach(key => {
     const slider = document.getElementById(key);
-    const valueDisplay = document.getElementById(`${key}-value`);
-
-    if (slider && activeValues[key] !== undefined) {
-      slider.value = activeValues[key];
-      updateValueDisplay(key, activeValues[key], valueDisplay);
+    if (slider && vals[key] !== undefined) {
+      slider.value = vals[key];
+      updateValueDisplay(key, vals[key], document.getElementById(`${key}-value`));
     }
   });
 }
 
 function updateSelectsUI() {
-  const activeValues = state.presets[state.activePreset];
-  if (!activeValues) return;
+  const vals = state.presets[state.activePreset];
+  if (!vals) return;
 
   SELECT_KEYS.forEach(key => {
-    const select = document.getElementById(key);
-    if (select && activeValues[key] !== undefined) {
-      select.value = activeValues[key];
-    }
+    const el = document.getElementById(key);
+    if (el && vals[key] !== undefined) el.value = vals[key];
   });
-
-  // Update warmth mode state
   updateWarmthModeState();
 }
 
 function updateWarmthModeState() {
-  const activeValues = state.presets[state.activePreset];
-  const warmthModeSelect = document.getElementById('warmthMode');
-  const warmthModeContainer = document.getElementById('warmth-mode-container');
-  const warmthModeBadge = document.getElementById('warmth-mode-badge');
+  const vals = state.presets[state.activePreset];
+  const select = document.getElementById('warmthMode');
+  const container = document.getElementById('warmth-mode-container');
+  const badge = document.getElementById('warmth-mode-badge');
 
-  if (!warmthModeSelect || !activeValues) return;
+  if (!select || !vals) return;
 
-  // Check if warmth is active
-  const warmthValue = activeValues.warmth || 0;
-  const isWarmthActive = Math.abs(warmthValue) > 0;
+  const isActive = Math.abs(vals.warmth || 0) > 0;
 
-  // Enable/disable based on warmth value
-  if (warmthModeContainer) {
-    warmthModeContainer.classList.toggle('disabled', !isWarmthActive);
-  }
-  warmthModeSelect.disabled = !isWarmthActive;
+  if (container) container.classList.toggle('disabled', !isActive);
+  select.disabled = !isActive;
 
-  // Update badge text
-  if (warmthModeBadge) {
-    const modeText = activeValues.warmthMode === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
-    warmthModeBadge.textContent = isWarmthActive ? modeText : 'Inactive';
+  if (badge) {
+    badge.textContent = isActive
+      ? (vals.warmthMode === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple')
+      : 'Inactive';
   }
 }
 
-function updateValueDisplay(key, value, element) {
-  if (!element) return;
+function updateValueDisplay(key, value, el) {
+  if (!el) return;
+  if (key === 'warmth') el.textContent = `${value > 0 ? '+' : ''}${value}°`;
+  else if (key === 'sharpness') el.textContent = value === 0 ? 'Off' : `${value}%`;
+  else el.textContent = `${value}%`;
+}
 
-  switch (key) {
-    case 'warmth':
-      const sign = value > 0 ? '+' : '';
-      element.textContent = `${sign}${value}°`;
-      break;
-    case 'sharpness':
-      element.textContent = value === 0 ? 'Off' : `${value}%`;
-      break;
-    default:
-      element.textContent = `${value}%`;
-  }
+function updateTabsUI() {
+  document.getElementById('tab-global')?.classList.toggle('active', state.scope === 'global');
+  document.getElementById('tab-site')?.classList.toggle('active', state.scope === 'site');
 }
 
 function updateAllUI() {
+  updateTabsUI();
   updateToggleUI();
   updatePresetButtonsUI();
   updateSlidersUI();
   updateSelectsUI();
 }
-
-// ============================================================
-// Event Handlers
-// ============================================================
 
 function handleToggleChange(e) {
   state.enabled = e.target.checked;
@@ -281,132 +243,96 @@ function handlePresetClick(e) {
   const item = e.target.closest('.preset-item');
   if (!item) return;
 
-  const presetName = item.dataset.preset;
-  if (!presetName || presetName === state.activePreset) return;
+  const name = item.dataset.preset;
+  if (!name || name === state.activePreset) return;
 
-  // Switch to new preset
-  state.activePreset = presetName;
+  state.activePreset = name;
 
-  // Update UI to reflect new preset's values
   updatePresetButtonsUI();
   updateSlidersUI();
   updateSelectsUI();
-
-  // Save state
   saveState();
 }
 
 function handlePresetReset(e) {
-  // Stop event from bubbling to preset button
   e.stopPropagation();
-
   const item = e.target.closest('.preset-item');
   if (!item) return;
 
-  const presetName = item.dataset.preset;
-  if (!presetName || !FACTORY_DEFAULTS[presetName]) return;
+  const name = item.dataset.preset;
+  if (FACTORY_DEFAULTS[name]) {
+    state.presets[name] = deepClone(FACTORY_DEFAULTS[name]);
+    updatePresetButtonsUI();
 
-  // Reset this preset to factory defaults
-  state.presets[presetName] = deepClone(FACTORY_DEFAULTS[presetName]);
-
-  // Update UI
-  updatePresetButtonsUI();
-
-  // If this is the active preset, also update sliders and selects
-  if (presetName === state.activePreset) {
-    updateSlidersUI();
-    updateSelectsUI();
+    if (name === state.activePreset) {
+      updateSlidersUI();
+      updateSelectsUI();
+    }
+    saveState();
   }
-
-  // Save state
-  saveState();
 }
+
+// 300ms debounce prevents disk thrashing while dragging sliders
+const debouncedSave = debounce(saveState, 300);
 
 function handleSliderInput(e) {
   const key = e.target.id;
-  const value = parseInt(e.target.value, 10);
+  const val = parseInt(e.target.value, 10);
 
-  // Update active preset's value
   if (state.presets[state.activePreset]) {
-    state.presets[state.activePreset][key] = value;
+    state.presets[state.activePreset][key] = val;
   }
 
-  // Update value display
-  const valueDisplay = document.getElementById(`${key}-value`);
-  updateValueDisplay(key, value, valueDisplay);
-
-  // Update modified indicator on preset button
+  updateValueDisplay(key, val, document.getElementById(`${key}-value`));
   updatePresetButtonsUI();
 
-  // Special handling for warmth slider
-  if (key === 'warmth') {
-    updateWarmthModeState();
-  }
+  if (key === 'warmth') updateWarmthModeState();
 
-  // Save state
-  saveState();
+  broadcastChanges();
+  debouncedSave();
+}
+
+function broadcastChanges() {
+  browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+    if (tabs[0]?.id) {
+      browser.tabs.sendMessage(tabs[0].id, {
+        type: 'UPDATE_SETTINGS',
+        settings: {
+          enabled: state.enabled,
+          activePreset: state.activePreset,
+          presets: state.presets
+        }
+      }).catch(() => { });
+    }
+  });
 }
 
 function handleSelectChange(e) {
   const key = e.target.id;
-  const value = e.target.value;
-
-  // Update active preset's value
   if (state.presets[state.activePreset]) {
-    state.presets[state.activePreset][key] = value;
+    state.presets[state.activePreset][key] = e.target.value;
   }
 
-  // Update badge for warmth mode
   if (key === 'warmthMode') {
     const badge = document.getElementById('warmth-mode-badge');
-    if (badge) {
-      badge.textContent = value === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
-    }
+    if (badge) badge.textContent = e.target.value === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
   }
 
-  // Update modified indicator on preset button
   updatePresetButtonsUI();
-
-  // Save state
   saveState();
 }
 
-// ============================================================
-// Initialization
-// ============================================================
-
 function attachEventListeners() {
-  // Toggle
-  const toggle = document.getElementById('enabled-toggle');
-  if (toggle) {
-    toggle.addEventListener('change', handleToggleChange);
-  }
+  document.getElementById('enabled-toggle')?.addEventListener('change', handleToggleChange);
 
-  // Preset buttons
-  document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', handlePresetClick);
-  });
+  document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', handlePresetClick));
+  document.querySelectorAll('.preset-reset').forEach(b => b.addEventListener('click', handlePresetReset));
 
-  // Preset reset buttons
-  document.querySelectorAll('.preset-reset').forEach(btn => {
-    btn.addEventListener('click', handlePresetReset);
-  });
+  SLIDER_KEYS.forEach(k => document.getElementById(k)?.addEventListener('input', handleSliderInput));
+  SELECT_KEYS.forEach(k => document.getElementById(k)?.addEventListener('change', handleSelectChange));
 
-  // Sliders
-  SLIDER_KEYS.forEach(key => {
-    const slider = document.getElementById(key);
-    if (slider) {
-      slider.addEventListener('input', handleSliderInput);
-    }
-  });
-
-  // Selects
-  SELECT_KEYS.forEach(key => {
-    const select = document.getElementById(key);
-    if (select) {
-      select.addEventListener('change', handleSelectChange);
-    }
-  });
+  document.getElementById('tab-global')?.addEventListener('click', () => switchScope('global'));
+  document.getElementById('tab-site')?.addEventListener('click', () => switchScope('site'));
 }
 
 async function init() {
@@ -415,5 +341,4 @@ async function init() {
   attachEventListeners();
 }
 
-// Start
 init();
