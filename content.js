@@ -43,8 +43,8 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function createSharpnessElements(sharpness, inputName, outputName) {
-    const fragment = document.createDocumentFragment();
+const createSharpnessElements = (sharpness, inputName, outputName) => {
+    const f = document.createDocumentFragment();
     const strength = (sharpness / 100) * 3;
     const k2 = 1 + strength;
     const k3 = -strength;
@@ -64,8 +64,8 @@ function createSharpnessElements(sharpness, inputName, outputName) {
     composite.setAttribute('k4', '0');
     composite.setAttribute('result', outputName);
 
-    fragment.append(blur, composite);
-    return fragment;
+    f.append(blur, composite);
+    return f;
 }
 
 function createSimpleWarmthElement(warmth, inputName, outputName) {
@@ -91,13 +91,13 @@ function createSimpleWarmthElement(warmth, inputName, outputName) {
 }
 
 function createCinematicWarmthElements(warmth, inputName, outputName) {
-    const fragment = document.createDocumentFragment();
+    const frag = document.createDocumentFragment();
     const w = warmth / 100;
 
     // 1. Tonal Separation: Push warmth into midtones/highlights, cool down shadows
-    const gammaTransfer = document.createElementNS(SVG_NAMESPACE, 'feComponentTransfer');
-    gammaTransfer.setAttribute('in', inputName);
-    gammaTransfer.setAttribute('result', 'gammaCorrected');
+    const gt = document.createElementNS(SVG_NAMESPACE, 'feComponentTransfer');
+    gt.setAttribute('in', inputName);
+    gt.setAttribute('result', 'gammaCorrected');
 
     const funcR = document.createElementNS(SVG_NAMESPACE, 'feFuncR');
     funcR.setAttribute('type', 'gamma');
@@ -121,8 +121,8 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     const funcA = document.createElementNS(SVG_NAMESPACE, 'feFuncA');
     funcA.setAttribute('type', 'identity');
 
-    gammaTransfer.append(funcR, funcG, funcB, funcA);
-    fragment.appendChild(gammaTransfer);
+    gt.append(funcR, funcG, funcB, funcA);
+    frag.appendChild(gt);
 
     // Stage 2: Highlight color shift
     const highlightShift = document.createElementNS(SVG_NAMESPACE, 'feColorMatrix');
@@ -140,7 +140,7 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
         '0', '0', '0', '1', '0'
     ].join(' '));
 
-    fragment.appendChild(highlightShift);
+    frag.appendChild(highlightShift);
 
     // Stage 3: Final blend
     const finalGrade = document.createElementNS(SVG_NAMESPACE, 'feColorMatrix');
@@ -158,56 +158,23 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
         '0', '0', '0', '1', '0'
     ].join(' '));
 
-    fragment.appendChild(finalGrade);
-    return fragment;
+    frag.appendChild(finalGrade);
+    return frag;
 }
 
 function createWarmthElements(warmth, mode, inputName, outputName) {
-    if (mode === WARMTH_MODE.CINEMATIC) {
+    if (mode === 'cinematic') {
         return createCinematicWarmthElements(warmth, inputName, outputName);
     }
     return createSimpleWarmthElement(warmth, inputName, outputName);
 }
 
-function createCombinedFilterSVG(filterId, sharpness, warmth, warmthMode) {
-    const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
-    svg.setAttribute('xmlns', SVG_NAMESPACE);
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('focusable', 'false');
-    svg.style.cssText = 'position:absolute;width:0;height:0;';
 
-    const filter = document.createElementNS(SVG_NAMESPACE, 'filter');
-    filter.setAttribute('id', filterId);
-    filter.setAttribute('color-interpolation-filters', 'sRGB');
-    filter.setAttribute('x', '0');
-    filter.setAttribute('y', '0');
-    filter.setAttribute('width', '100%');
-    filter.setAttribute('height', '100%');
-
-    let currentInput = 'SourceGraphic';
-    let stepCount = 0;
-
-    if (Math.abs(warmth) > 0.5) {
-        const outputName = `step${++stepCount}`;
-        const warmthElements = createWarmthElements(warmth, warmthMode, currentInput, outputName);
-        filter.appendChild(warmthElements);
-        currentInput = outputName;
-    }
-
-    if (sharpness > 0) {
-        const outputName = `step${++stepCount}`;
-        const sharpnessElements = createSharpnessElements(sharpness, currentInput, outputName);
-        filter.appendChild(sharpnessElements);
-    }
-
-    svg.appendChild(filter);
-    return svg;
-}
 
 function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
     const normSharpness = clamp(Math.round(sharpness), 0, 100);
     const normWarmth = clamp(warmth, -100, 100);
-    const normMode = warmthMode === WARMTH_MODE.CINEMATIC ? WARMTH_MODE.CINEMATIC : WARMTH_MODE.SIMPLE;
+    const normMode = warmthMode === 'cinematic' ? 'cinematic' : 'simple';
     const needsFilter = normSharpness > 0 || Math.abs(normWarmth) > 0.5;
 
     if (normSharpness === state.currentSharpness &&
@@ -242,7 +209,7 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
         document.body.appendChild(container);
     }
 
-    const modePrefix = normMode === WARMTH_MODE.CINEMATIC ? 'c' : 's';
+    const modePrefix = normMode === 'cinematic' ? 'c' : 's';
     const filterId = `${SVG_FILTER_ID}-${modePrefix}${normWarmth.toFixed(0)}-sh${normSharpness}`;
     const svg = createCombinedFilterSVG(filterId, normSharpness, normWarmth, normMode);
 
@@ -306,7 +273,7 @@ function applyFilters(data) {
         const intensity = getNumericValue(activeValues.intensity, 100) / 100;
         const sharpness = parseInt(activeValues.sharpness ?? 0, 10);
         const warmth = getNumericValue(activeValues.warmth, 0) * intensity;
-        const warmthMode = activeValues.warmthMode || WARMTH_MODE.SIMPLE;
+        const warmthMode = activeValues.warmthMode || 'simple';
 
         const svgFilterId = updateSVGFilter(sharpness, warmth, warmthMode);
         updateStyleElement(buildFilterString(activeValues, svgFilterId));
@@ -382,6 +349,41 @@ function initMutationObserver() {
     if (document.body) startObserving();
     else document.addEventListener('DOMContentLoaded', startObserving, { once: true });
     return observer;
+}
+
+function createCombinedFilterSVG(filterId, sharpness, warmth, warmthMode) {
+    const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+    svg.setAttribute('xmlns', SVG_NAMESPACE);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.style.cssText = 'position:absolute;width:0;height:0;';
+
+    const filter = document.createElementNS(SVG_NAMESPACE, 'filter');
+    filter.setAttribute('id', filterId);
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    filter.setAttribute('x', '0');
+    filter.setAttribute('y', '0');
+    filter.setAttribute('width', '100%');
+    filter.setAttribute('height', '100%');
+
+    let currentInput = 'SourceGraphic';
+    let stepCount = 0;
+
+    if (Math.abs(warmth) > 0.5) {
+        const outputName = `step${++stepCount}`;
+        const warmthElements = createWarmthElements(warmth, warmthMode, currentInput, outputName);
+        filter.appendChild(warmthElements);
+        currentInput = outputName;
+    }
+
+    if (sharpness > 0) {
+        const outputName = `step${++stepCount}`;
+        const sharpnessElements = createSharpnessElements(sharpness, currentInput, outputName);
+        filter.appendChild(sharpnessElements);
+    }
+
+    svg.appendChild(filter);
+    return svg;
 }
 
 function init() {

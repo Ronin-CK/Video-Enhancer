@@ -1,4 +1,4 @@
-const WARMTH_MODE = {
+var WARMTH_MODE = {
   SIMPLE: 'simple',
   CINEMATIC: 'cinematic'
 };
@@ -17,11 +17,12 @@ const SELECT_KEYS = ['warmthMode'];
 const ALL_SETTING_KEYS = [...SLIDER_KEYS, ...SELECT_KEYS];
 const DEFAULT_ACTIVE_PRESET = 'balanced';
 
+var currentPresetName = DEFAULT_ACTIVE_PRESET;
+var currentScope = 'global';
+
 let state = {
   enabled: true,
-  activePreset: DEFAULT_ACTIVE_PRESET,
   presets: deepClone(FACTORY_DEFAULTS),
-  scope: 'global', // 'global' | 'site'
   hostname: null,
   siteSettings: {},
   globalSettings: null
@@ -30,6 +31,8 @@ let state = {
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
+
+function getEl(id) { return document.getElementById(id); }
 
 function debounce(func, wait) {
   let timeout;
@@ -75,13 +78,13 @@ async function loadState() {
     // Cache global for fast switching back
     state.globalSettings = {
       enabled: state.enabled,
-      activePreset: state.activePreset,
+      activePreset: currentPresetName,
       presets: deepClone(state.presets)
     };
 
     // Auto-switch to site scope if settings exist for this host
     if (hostname && state.siteSettings[hostname]) {
-      state.scope = 'site';
+      currentScope = 'site';
       loadSettingsFromData(state.siteSettings[hostname]);
     }
 
@@ -95,17 +98,17 @@ async function loadState() {
     console.error(e);
     // Fallback defaults
     state.enabled = true;
-    state.activePreset = DEFAULT_ACTIVE_PRESET;
+    currentPresetName = DEFAULT_ACTIVE_PRESET;
     state.presets = deepClone(FACTORY_DEFAULTS);
   }
 }
 
 function loadSettingsFromData(data) {
   state.enabled = data.enabled ?? true;
-  state.activePreset = data.activePreset || DEFAULT_ACTIVE_PRESET;
+  currentPresetName = data.activePreset || DEFAULT_ACTIVE_PRESET;
 
-  if (!FACTORY_DEFAULTS[state.activePreset]) {
-    state.activePreset = DEFAULT_ACTIVE_PRESET;
+  if (!FACTORY_DEFAULTS[currentPresetName]) {
+    currentPresetName = DEFAULT_ACTIVE_PRESET;
   }
 
   if (data.presets) {
@@ -125,23 +128,23 @@ function loadSettingsFromData(data) {
 function saveState() {
   const data = {
     enabled: state.enabled,
-    activePreset: state.activePreset,
+    activePreset: currentPresetName,
     presets: state.presets
   };
 
-  if (state.scope === 'global') {
+  if (currentScope === 'global') {
     browser.storage.local.set(data).catch(console.error);
-  } else if (state.scope === 'site' && state.hostname) {
+  } else if (currentScope === 'site' && state.hostname) {
     state.siteSettings[state.hostname] = data;
     browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
   }
 }
 
 function switchScope(newScope) {
-  if (newScope === state.scope) return;
+  if (newScope === currentScope) return;
   if (newScope === 'site' && !state.hostname) return;
 
-  state.scope = newScope;
+  currentScope = newScope;
 
 
   if (newScope === 'site') {
@@ -152,7 +155,7 @@ function switchScope(newScope) {
     // Restore cached global settings so we don't lose previous edits
     if (state.globalSettings) {
       state.enabled = state.globalSettings.enabled;
-      state.activePreset = state.globalSettings.activePreset;
+      currentPresetName = state.globalSettings.activePreset;
       state.presets = deepClone(state.globalSettings.presets);
     } else {
       loadState();
@@ -173,26 +176,42 @@ function updatePresetButtonsUI() {
     const btn = item.querySelector('.preset-btn');
     if (!btn) return;
 
-    btn.classList.toggle('active', name === state.activePreset);
+    btn.classList.toggle('active', name === currentPresetName);
     item.classList.toggle('modified', isPresetModified(name));
   });
 }
 
 function updateSlidersUI() {
-  const vals = state.presets[state.activePreset];
+  const vals = state.presets[currentPresetName];
   if (!vals) return;
 
-  SLIDER_KEYS.forEach(key => {
+  const bSlider = getEl('brightness');
+  if (bSlider) {
+    bSlider.value = vals.brightness;
+    updateValueDisplay('brightness', vals.brightness, getEl('brightness-value'));
+  }
+
+  const cSlider = getEl('contrast');
+  if (cSlider) {
+    cSlider.value = vals.contrast;
+    updateValueDisplay('contrast', vals.contrast, getEl('contrast-value'));
+  }
+
+  SLIDER_KEYS.slice(2).forEach(key => {
     const slider = document.getElementById(key);
-    if (slider && vals[key] !== undefined) {
-      slider.value = vals[key];
-      updateValueDisplay(key, vals[key], document.getElementById(`${key}-value`));
+    if (slider) {
+      if (vals[key] !== undefined) {
+        slider.value = vals[key];
+        updateValueDisplay(key, vals[key], document.getElementById(`${key}-value`));
+      } else {
+        slider.value = 100;
+      }
     }
   });
 }
 
 function updateSelectsUI() {
-  const vals = state.presets[state.activePreset];
+  const vals = state.presets[currentPresetName];
   if (!vals) return;
 
   SELECT_KEYS.forEach(key => {
@@ -203,7 +222,7 @@ function updateSelectsUI() {
 }
 
 function updateWarmthModeState() {
-  const vals = state.presets[state.activePreset];
+  const vals = state.presets[currentPresetName];
   const select = document.getElementById('warmthMode');
   const container = document.getElementById('warmth-mode-container');
   const badge = document.getElementById('warmth-mode-badge');
@@ -230,8 +249,8 @@ function updateValueDisplay(key, value, el) {
 }
 
 function updateTabsUI() {
-  document.getElementById('tab-global')?.classList.toggle('active', state.scope === 'global');
-  document.getElementById('tab-site')?.classList.toggle('active', state.scope === 'site');
+  document.getElementById('tab-global')?.classList.toggle('active', currentScope === 'global');
+  document.getElementById('tab-site')?.classList.toggle('active', currentScope === 'site');
 }
 
 function updateAllUI() {
@@ -242,7 +261,7 @@ function updateAllUI() {
   updateSelectsUI();
 }
 
-function handleToggleChange(e) {
+function toggleEnabled(e) {
   state.enabled = e.target.checked;
   saveState();
 }
@@ -252,9 +271,9 @@ function handlePresetClick(e) {
   if (!item) return;
 
   const name = item.dataset.preset;
-  if (!name || name === state.activePreset) return;
+  if (!name || name === currentPresetName) return;
 
-  state.activePreset = name;
+  currentPresetName = name;
 
   updatePresetButtonsUI();
   updateSlidersUI();
@@ -272,7 +291,7 @@ function handlePresetReset(e) {
     state.presets[name] = deepClone(FACTORY_DEFAULTS[name]);
     updatePresetButtonsUI();
 
-    if (name === state.activePreset) {
+    if (name === currentPresetName) {
       updateSlidersUI();
       updateSelectsUI();
     }
@@ -287,8 +306,8 @@ function handleSliderInput(e) {
   const key = e.target.id;
   const val = parseInt(e.target.value, 10);
 
-  if (state.presets[state.activePreset]) {
-    state.presets[state.activePreset][key] = val;
+  if (state.presets[currentPresetName]) {
+    state.presets[currentPresetName][key] = val;
   }
 
   updateValueDisplay(key, val, document.getElementById(`${key}-value`));
@@ -307,7 +326,7 @@ function broadcastChanges() {
         type: 'UPDATE_SETTINGS',
         settings: {
           enabled: state.enabled,
-          activePreset: state.activePreset,
+          activePreset: currentPresetName,
           presets: state.presets
         }
       }).catch(() => { });
@@ -317,8 +336,8 @@ function broadcastChanges() {
 
 function handleSelectChange(e) {
   const key = e.target.id;
-  if (state.presets[state.activePreset]) {
-    state.presets[state.activePreset][key] = e.target.value;
+  if (state.presets[currentPresetName]) {
+    state.presets[currentPresetName][key] = e.target.value;
   }
 
   if (key === 'warmthMode') {
@@ -331,7 +350,7 @@ function handleSelectChange(e) {
 }
 
 function attachEventListeners() {
-  document.getElementById('enabled-toggle')?.addEventListener('change', handleToggleChange);
+  document.getElementById('enabled-toggle')?.addEventListener('change', toggleEnabled);
 
   document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', handlePresetClick));
   document.querySelectorAll('.preset-reset').forEach(b => b.addEventListener('click', handlePresetReset));
