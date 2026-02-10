@@ -9,7 +9,7 @@
 
 <body>
 
-    <!-- Header with Toggle -->
+    <!-- header -->
     <div class="header">
         <div class="title">Video Enhancer</div>
         <label class="toggle">
@@ -19,15 +19,26 @@
         </label>
     </div>
 
-    </div>
-
-    <!-- Scope Tabs -->
+    <!-- settings scope -->
     <div class="tabs">
         <button class="tab-btn active" id="tab-global">Global Defaults</button>
         <button class="tab-btn" id="tab-site">Current Site</button>
     </div>
 
-    <!-- Presets Section -->
+    <!-- image enhancement -->
+    <div class="section" style="margin-bottom: 12px;">
+        <div class="control-header">
+            <span class="control-label"
+                style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Enhance Images</span>
+            <label class="toggle" style="transform: scale(0.8); margin-right: -4px;">
+                <input type="checkbox" id="images-toggle">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+            </label>
+        </div>
+    </div>
+
+    <!-- presets -->
     <div class="section">
         <div class="section-label">Presets</div>
         <div class="preset-grid">
@@ -60,7 +71,7 @@
 
     <div class="divider"></div>
 
-    <!-- Sliders Section -->
+    <!-- adjustments -->
     <div class="section">
         <div class="section-label">Adjustments</div>
 
@@ -96,7 +107,7 @@
             <input type="range" id="warmth" min="-30" max="30" value="0">
         </div>
 
-        <!-- Warmth Mode Sub-control -->
+        <!-- warmth style -->
         <div class="control sub-control" id="warmth-mode-container">
             <div class="control-header">
                 <span class="control-label">
