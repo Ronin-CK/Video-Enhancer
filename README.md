@@ -1,4 +1,4 @@
-# 🎬 Video Enhancer (Fake HDR)
+# Video Enhancer
 
 <div align="center">
 
@@ -16,23 +16,23 @@
 </div>
 
 
-## 🎯 About
+## About
 
 Video Enhancer applies **real-time CSS filter adjustments** to videos, boosting contrast, saturation, and perceived dynamic range — all without touching the video source itself.
 
 > 💡 Think of it as a **smart color enhancer**, not true HDR. No metadata processing, no decoding changes, no GPU trickery.
 
 Perfect for:
-- 📺 LED monitors without HDR support
-- 🎥 Enhancing washed-out streaming content
-- 🎮 Adding vibrancy to gameplay footage
-- 🎬 Customizing video appearance to your preference
+- LED monitors without HDR support
+- Enhancing washed-out streaming content
+- Adding vibrancy to gameplay footage
+- Customizing video appearance to your preference
 
 ---
 
 ## ✨ Features
 
-### 🎨 Presets
+### Presets
 
 Choose from carefully tuned color profiles:
 
@@ -57,11 +57,11 @@ Fine-tune your viewing experience:
 
 ### ⚡ Performance & UX
 
-- 🔘 **One-click toggle** — Enable/disable instantly
-- 🎛️ **Live adjustments** — No page reloads required
-- 💾 **Per-site settings** — Remembers your preferences
-- ♻️ **Reset options** — Individual presets or everything
-- 🚀 **Runs at `document_start`** — Instant effect on page load
+- **One-click toggle** — Enable/disable instantly
+- **Live adjustments** — No page reloads required
+- **Per-site settings** — Remembers your preferences
+- **Reset options** — Individual presets or everything
+- **Runs at** — Instant effect on page load
 
 ---
 
@@ -86,3 +86,4 @@ about:debugging#/runtime/this-firefox
 
 # Click "Load Temporary Add-on"
 # Select the manifest.json file from the cloned folder
+```
