@@ -4,6 +4,10 @@
     padding: 0;
 }
 
+html {
+    background-color: var(--bg-color);
+}
+
 :root {
     color-scheme: light dark;
     --bg-color: #ffffff;
@@ -40,6 +44,7 @@
     }
 }
 
+/* base styles */
 body {
     width: 300px;
     padding: 16px;
@@ -49,7 +54,7 @@ body {
     color: var(--text-color);
 }
 
-/* Header & Title */
+/* header */
 .header {
     display: flex;
     justify-content: space-between;
@@ -168,7 +173,7 @@ body {
     outline-offset: 2px;
 }
 
-/* Presets */
+/* presets */
 .section {
     margin-bottom: 16px;
 }
@@ -258,6 +263,20 @@ body {
     outline-offset: 2px;
 }
 
+.preset-rename-input {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: center;
+    outline: none;
+    font-family: inherit;
+}
+
 
 
 .divider {
@@ -266,7 +285,7 @@ body {
     margin: 16px 0;
 }
 
-/* Controls */
+/* manual adjustments */
 .control {
     margin-bottom: 14px;
 }
