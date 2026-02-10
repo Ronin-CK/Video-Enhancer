@@ -162,6 +162,7 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     return frag;
 }
 
+// create warmth elements based on mode
 function createWarmthElements(warmth, mode, inputName, outputName) {
     if (mode === 'cinematic') {
         return createCinematicWarmthElements(warmth, inputName, outputName);
@@ -223,6 +224,7 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
     return filterId;
 }
 
+// generate filter string for css
 function buildFilterString(values, svgFilterId) {
     const intensity = getNumericValue(values.intensity, 100) / 100;
     const brightness = 100 + (getNumericValue(values.brightness, 100) - 100) * intensity;
@@ -239,7 +241,8 @@ function buildFilterString(values, svgFilterId) {
     return filters.join(' ');
 }
 
-function updateStyleElement(filterValue) {
+// update style tag with filter rules
+function updateStyleElement(filterValue, enableImages) {
     let style = document.getElementById(STYLE_ID);
     if (!style) {
         style = document.createElement('style');
@@ -247,19 +250,24 @@ function updateStyleElement(filterValue) {
         (document.head || document.documentElement).appendChild(style);
     }
 
+    const imageFilter = enableImages ? `${filterValue} !important` : 'none !important';
+
     style.textContent = `
         video, .html5-main-video, .video-stream, .html5-video-player video,
         [class*="player"] video, [data-player] video {
             filter: ${filterValue} !important;
         }
+
         img, picture, svg:not(#${SVG_CONTAINER_ID} svg), [role="img"],
         ytd-thumbnail, .ytp-videowall-still-image, yt-image, yt-img-shadow,
-        .thumbnail, [class*="thumbnail"], [class*="poster"] {
-            filter: none !important;
+        .thumbnail, [class*="thumbnail"], [class*="poster"],
+        [style*="url"] {
+            filter: ${imageFilter};
         }
     `;
 }
 
+// apply all filters to the page
 function applyFilters(data) {
     try {
         if (!data || data.enabled === false) {
@@ -274,9 +282,10 @@ function applyFilters(data) {
         const sharpness = parseInt(activeValues.sharpness ?? 0, 10);
         const warmth = getNumericValue(activeValues.warmth, 0) * intensity;
         const warmthMode = activeValues.warmthMode || 'simple';
+        const enableImages = data.enableImages ?? false;
 
         const svgFilterId = updateSVGFilter(sharpness, warmth, warmthMode);
-        updateStyleElement(buildFilterString(activeValues, svgFilterId));
+        updateStyleElement(buildFilterString(activeValues, svgFilterId), enableImages);
 
         state.isInitialized = true;
     } catch (error) {
@@ -317,14 +326,21 @@ function loadAndApplySettings() {
 
 const debouncedLoadSettings = debounce(loadAndApplySettings, DEBOUNCE_DELAY);
 
+let ignoreStorageUpdateUntil = 0;
+
 function initStorageListener() {
     browser.storage.onChanged.addListener((changes, area) => {
+        if (Date.now() < ignoreStorageUpdateUntil) return;
         if (area === 'local') loadAndApplySettings();
     });
 
     browser.runtime.onMessage.addListener((message) => {
         if (message.type === 'UPDATE_SETTINGS' && message.settings) {
-            applyFilters(resolveSettings(message.settings));
+            if (message.ignoreStorage) {
+                // Ignore storage updates for 500ms to prevent revert
+                ignoreStorageUpdateUntil = Date.now() + 500;
+            }
+            applyFilters(message.settings);
         }
     });
 }
