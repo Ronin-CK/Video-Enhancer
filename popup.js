@@ -4,12 +4,12 @@ var WARMTH_MODE = {
 };
 
 const FACTORY_DEFAULTS = {
-  subtle: { name: 'Subtle', brightness: 102, contrast: 108, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-  balanced: { name: 'Balanced', brightness: 105, contrast: 115, saturate: 120, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-  vivid: { name: 'Vivid', brightness: 108, contrast: 125, saturate: 140, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-  cinema: { name: 'Cinema', brightness: 100, contrast: 120, saturate: 115, warmth: 15, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 },
-  gaming: { name: 'Gaming', brightness: 110, contrast: 130, saturate: 135, warmth: -5, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-  warm: { name: 'Warm', brightness: 105, contrast: 110, saturate: 115, warmth: 25, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 }
+  subtle: { name: 'Subtle', brightness: 102, contrast: 108, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 50, sharpness: 0 },
+  balanced: { name: 'Balanced', brightness: 105, contrast: 115, saturate: 120, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 50, sharpness: 0 },
+  vivid: { name: 'Vivid', brightness: 108, contrast: 125, saturate: 140, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 50, sharpness: 0 },
+  cinema: { name: 'Cinema', brightness: 100, contrast: 120, saturate: 115, warmth: 15, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 50, sharpness: 0 },
+  gaming: { name: 'Gaming', brightness: 110, contrast: 130, saturate: 135, warmth: -5, warmthMode: WARMTH_MODE.SIMPLE, intensity: 50, sharpness: 0 },
+  warm: { name: 'Warm', brightness: 105, contrast: 110, saturate: 115, warmth: 25, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 50, sharpness: 0 }
 };
 
 const DEFAULT_PRESET_NAMES = {
@@ -95,6 +95,7 @@ async function loadState() {
       presets: deepClone(state.presets)
     };
 
+    // Auto-switch to site scope if settings exist for this host
     if (hostname && state.siteSettings[hostname]) {
       currentScope = 'site';
       loadSettingsFromData(state.siteSettings[hostname]);
@@ -129,6 +130,7 @@ function loadSettingsFromData(data) {
     state.presets = {};
     for (const name of Object.keys(FACTORY_DEFAULTS)) {
       state.presets[name] = { ...FACTORY_DEFAULTS[name], ...data.presets[name] };
+      // Ensure name exists if old data didn't have it
       if (!state.presets[name].name) {
         state.presets[name].name = FACTORY_DEFAULTS[name].name;
       }
@@ -171,7 +173,14 @@ function switchScope(newScope) {
   if (newScope === 'site') {
     const siteData = state.siteSettings[state.hostname];
     if (siteData) loadSettingsFromData(siteData);
+    // if no site-specific settings, just keep current values as starting point
   } else {
+    // switching back to global: remove site-specific settings
+    if (state.hostname && state.siteSettings[state.hostname]) {
+      delete state.siteSettings[state.hostname];
+      browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
+    }
+
     // restore cached global state
     if (state.globalSettings) {
       state.enabled = state.globalSettings.enabled;
@@ -184,6 +193,7 @@ function switchScope(newScope) {
     }
   }
   updateAllUI();
+  broadcastChanges();
 }
 
 function updateToggleUI() {
@@ -349,16 +359,20 @@ function handlePresetRightClick(e) {
   const item = btn.closest('.preset-item');
   const key = item.dataset.preset;
 
+  // Replace text with input
   const originalName = state.presetNames[key] || DEFAULT_PRESET_NAMES[key];
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'preset-rename-input';
   input.value = originalName;
+
+  // Swap
   btn.textContent = '';
   btn.appendChild(input);
   input.focus();
   input.select();
 
+  // Commit on enter or blur
   const commit = () => {
     let newName = input.value.trim();
     const factoryDefault = DEFAULT_PRESET_NAMES[key];
@@ -371,13 +385,13 @@ function handlePresetRightClick(e) {
     // Always save names globally
     browser.storage.local.set({ presetNames: state.presetNames }).catch(console.error);
 
-    updatePresetButtonsUI();
+    updatePresetButtonsUI(); // Will re-render button with text
   };
 
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') {
       ev.preventDefault();
-      input.blur();
+      input.blur(); // Triggers blur event which calls commit
     }
     if (ev.key === 'Escape') {
       ev.preventDefault();
@@ -386,7 +400,10 @@ function handlePresetRightClick(e) {
     }
   });
 
+  // finish editing on blur
   input.addEventListener('blur', commit, { once: true });
+
+  // prevent activation click when hitting input
   input.addEventListener('click', (ev) => ev.stopPropagation());
 }
 
@@ -394,6 +411,7 @@ function handlePresetRightClick(e) {
 const debouncedSave = debounce(saveState, 300);
 
 function handleSliderChange(e) {
+  // save immediately on release
   saveState();
 }
 

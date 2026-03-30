@@ -196,10 +196,6 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
     }
 
     if (!document.body) {
-        document.addEventListener('DOMContentLoaded', () => {
-            updateSVGFilter(normSharpness, normWarmth, normMode);
-            loadAndApplySettings();
-        }, { once: true });
         return null;
     }
 
@@ -247,7 +243,13 @@ function updateStyleElement(filterValue, enableImages) {
     if (!style) {
         style = document.createElement('style');
         style.id = STYLE_ID;
-        (document.head || document.documentElement).appendChild(style);
+    }
+
+    // Always ensure the style is in <head> when available (it may have been
+    // appended to documentElement at document_start before <head> existed)
+    const target = document.head || document.documentElement;
+    if (style.parentNode !== target) {
+        target.appendChild(style);
     }
 
     const imageFilter = enableImages ? `${filterValue} !important` : 'none !important';
@@ -276,7 +278,8 @@ function applyFilters(data) {
         }
 
         const presets = data.presets || PRESET_DEFAULTS;
-        const activeValues = presets[data.activePreset || 'balanced'] || PRESET_DEFAULTS.balanced;
+        const rawValues = presets[data.activePreset || 'balanced'] || PRESET_DEFAULTS.balanced;
+        const activeValues = { ...PRESET_DEFAULTS[data.activePreset || 'balanced'], ...rawValues };
 
         const intensity = getNumericValue(activeValues.intensity, 100) / 100;
         const sharpness = parseInt(activeValues.sharpness ?? 0, 10);
@@ -302,10 +305,50 @@ function removeFilters() {
     state.currentFilterId = null;
 }
 
-function getHostname() { return window.location.hostname.replace(/^www\./, ''); }
+// Cache for iframe hostname resolution
+let _cachedIframeHostname = null;
 
-function resolveSettings(data) {
-    const hostname = getHostname();
+async function getHostnameAsync() {
+    // Top-level page: simply use location
+    if (window.top === window.self) {
+        return window.location.hostname.replace(/^www\./, '');
+    }
+    // Iframe: try cached value first
+    if (_cachedIframeHostname) return _cachedIframeHostname;
+    // Try document.referrer
+    try {
+        if (document.referrer) {
+            _cachedIframeHostname = new URL(document.referrer).hostname.replace(/^www\./, '');
+            return _cachedIframeHostname;
+        }
+    } catch (e) {}
+    // Ask background script for the tab's real URL
+    try {
+        const response = await browser.runtime.sendMessage({ type: 'GET_TAB_HOSTNAME' });
+        if (response?.hostname) {
+            _cachedIframeHostname = response.hostname;
+            return _cachedIframeHostname;
+        }
+    } catch (e) {}
+    // Final fallback
+    return window.location.hostname.replace(/^www\./, '');
+}
+
+// Synchronous version for non-critical paths (uses cache or fallback)
+function getHostname() {
+    if (window.top === window.self) {
+        return window.location.hostname.replace(/^www\./, '');
+    }
+    if (_cachedIframeHostname) return _cachedIframeHostname;
+    try {
+        if (document.referrer) {
+            return new URL(document.referrer).hostname.replace(/^www\./, '');
+        }
+    } catch (e) {}
+    return window.location.hostname.replace(/^www\./, '');
+}
+
+function resolveSettings(data, hostname) {
     if (data.siteSettings && data.siteSettings[hostname]) {
         return {
             ...data.siteSettings[hostname],
@@ -315,29 +358,33 @@ function resolveSettings(data) {
     return data;
 }
 
-function loadAndApplySettings() {
-    browser.storage.local.get(null)
-        .then((data) => applyFilters(resolveSettings(data)))
+function loadAndApplySettings(source = 'unknown') {
+    Promise.all([
+        browser.storage.local.get(null),
+        getHostnameAsync()
+    ])
+        .then(([data, hostname]) => {
+            const resolved = resolveSettings(data, hostname);
+            applyFilters(resolved);
+        })
         .catch((error) => {
             console.error('Video Enhancer Load Error:', error);
-            applyFilters({ enabled: true, activePreset: 'balanced', presets: PRESET_DEFAULTS });
         });
 }
 
-const debouncedLoadSettings = debounce(loadAndApplySettings, DEBOUNCE_DELAY);
+const debouncedLoadSettings = debounce(() => loadAndApplySettings('debounce'), DEBOUNCE_DELAY);
 
 let ignoreStorageUpdateUntil = 0;
 
 function initStorageListener() {
     browser.storage.onChanged.addListener((changes, area) => {
         if (Date.now() < ignoreStorageUpdateUntil) return;
-        if (area === 'local') loadAndApplySettings();
+        if (area === 'local') loadAndApplySettings('storage-change');
     });
 
     browser.runtime.onMessage.addListener((message) => {
         if (message.type === 'UPDATE_SETTINGS' && message.settings) {
             if (message.ignoreStorage) {
-                // Ignore storage updates for 500ms to prevent revert
                 ignoreStorageUpdateUntil = Date.now() + 500;
             }
             applyFilters(message.settings);
@@ -348,6 +395,12 @@ function initStorageListener() {
 function initMutationObserver() {
     const observer = new MutationObserver((mutations) => {
         for (const m of mutations) {
+            for (const node of m.removedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE && node.id === SVG_CONTAINER_ID) {
+                    debouncedLoadSettings();
+                    return;
+                }
+            }
             for (const node of m.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
                 if (node.nodeName === 'VIDEO' || node.querySelector?.('video')) {
@@ -403,9 +456,21 @@ function createCombinedFilterSVG(filterId, sharpness, warmth, warmthMode) {
 }
 
 function init() {
-    loadAndApplySettings();
+    loadAndApplySettings('init');
     initStorageListener();
     initMutationObserver();
+
+    // Always re-apply once the DOM is fully parsed to ensure filters are correct.
+    // At document_start, the initial apply may be partial (no <head>/<body> yet)
+    // or storage may return incomplete data.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAndApplySettings('DOMContentLoaded');
+        }, { once: true });
+    } else {
+        // DOMContentLoaded already fired, re-apply with a microtask delay
+        setTimeout(() => loadAndApplySettings('fallback-timeout'), 0);
+    }
 }
 
 init();
