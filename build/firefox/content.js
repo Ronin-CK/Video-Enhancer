@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
 const STYLE_ID = 'firefox-hdr-optimizer-style';
 const SVG_FILTER_ID = 'video-enhancer-filter';
 const SVG_CONTAINER_ID = 'video-enhancer-svg-container';

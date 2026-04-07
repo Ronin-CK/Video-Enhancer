@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
 
 const DEFAULT_STATE = {
     enabled: true

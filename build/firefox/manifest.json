@@ -6,7 +6,12 @@
     "browser_specific_settings": {
         "gecko": {
             "id": "video-controller@ronin-ck.com",
-            "strict_min_version": "142.0"
+            "strict_min_version": "142.0",
+            "data_collection_permissions": {
+                "required": [
+                    "none"
+                ]
+            }
         }
     },
     "permissions": [
@@ -33,8 +38,7 @@
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
-            "16": "icon.png",
-            "48": "icon.png"
+            "128": "icon.png"
         },
         "default_title": "Video Enhancer"
     },
@@ -52,7 +56,6 @@
         }
     ],
     "icons": {
-        "48": "icon.png",
-        "96": "icon.png"
+        "128": "icon.png"
     }
 }

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
 
 let currentPresetName = DEFAULT_ACTIVE_PRESET;
 let currentScope = 'global';

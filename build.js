@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
 const fs = require('fs');
 const path = require('path');
 
@@ -40,12 +46,6 @@ function build() {
     };
 
     const firefoxManifest = { ...baseManifest };
-    firefoxManifest.browser_specific_settings = {
-        "gecko": {
-            "id": "video-controller@ronin-ck.com",
-            "strict_min_version": "142.0"
-        }
-    };
     firefoxManifest.background = {
         "scripts": [
             "shared.js",
