@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -70,9 +76,7 @@ body {
     gap: 8px;
 }
 
-.title::before {
-    content: "🎬";
-}
+
 
 /* Toggle */
 .toggle {
