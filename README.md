@@ -6,7 +6,7 @@
 [![Mozilla Add-on Users](https://img.shields.io/amo/users/video-enhancer?style=for-the-badge&logo=firefox&logoColor=white&label=Users)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-**A lightweight, cross-browser extension that enhances video playback with fake HDR-style color processing and shadow recovery — designed specifically for LED displays and IPS/TN panels that lack punchy colors or crush dark details.**
+**A lightweight, cross-browser(Firefox/Chrome) extension that enhances video playback with fake HDR-style color processing and shadow recovery — designed specifically for LED displays that lack punchy colors or crush dark details.**
 
 [**🦊 Install for Firefox**](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/) • [Report Bug](../../issues) • [Request Feature](../../issues)
 
