@@ -3,10 +3,11 @@
 <div align="center">
 
 [![Firefox Add-on](https://img.shields.io/amo/v/video-enhancer?label=Firefox%20Add-on&logo=firefox&logoColor=white&style=for-the-badge)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
+[![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v3.3.0-4285F4?logo=googlechrome&logoColor=white&style=for-the-badge)](#)
 [![Mozilla Add-on Users](https://img.shields.io/amo/users/video-enhancer?style=for-the-badge&logo=firefox&logoColor=white&label=Users)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-**A lightweight, cross-browser(Firefox/Chrome) extension that enhances video playback with fake HDR-style color processing and shadow recovery — designed specifically for LED displays that lack punchy colors or crush dark details.**
+**A lightweight, cross-browser (Firefox/Chrome) extension that enhances video playback with fake HDR-style color processing and shadow recovery — designed specifically for LED displays that lack punchy colors or crush dark details.**
 
 [**🦊 Install for Firefox**](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/) • [Report Bug](../../issues) • [Request Feature](../../issues)
 
