@@ -4,25 +4,15 @@ const SVG_CONTAINER_ID = 'video-enhancer-svg-container';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const DEBOUNCE_DELAY = 100;
 
-const WARMTH_MODE = {
-    SIMPLE: 'simple',
-    CINEMATIC: 'cinematic'
-};
-
-const PRESET_DEFAULTS = {
-    subtle: { brightness: 102, contrast: 108, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-    balanced: { brightness: 105, contrast: 115, saturate: 120, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-    vivid: { brightness: 108, contrast: 125, saturate: 140, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-    cinema: { brightness: 100, contrast: 120, saturate: 115, warmth: 15, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 },
-    gaming: { brightness: 110, contrast: 130, saturate: 135, warmth: -5, warmthMode: WARMTH_MODE.SIMPLE, intensity: 100, sharpness: 0 },
-    warm: { brightness: 105, contrast: 110, saturate: 115, warmth: 25, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 100, sharpness: 0 }
-};
+const SHADOW_FILTER_ID = 'video-enhancer-shadow';
 
 const state = {
     currentSharpness: null,
     currentWarmth: null,
     currentWarmthMode: null,
-    currentFilterId: null,
+    currentShadowBoost: null,
+    currentShadowFilterId: null,
+    currentMainFilterId: null,
     isInitialized: false
 };
 
@@ -37,10 +27,6 @@ function debounce(fn, delay) {
 function getNumericValue(value, fallback) {
     const num = parseFloat(value);
     return Number.isFinite(num) ? num : fallback;
-}
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
 }
 
 const createSharpnessElements = (sharpness, inputName, outputName) => {
@@ -94,7 +80,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     const frag = document.createDocumentFragment();
     const w = warmth / 100;
 
-    // 1. Tonal Separation: Push warmth into midtones/highlights, cool down shadows
     const gt = document.createElementNS(SVG_NAMESPACE, 'feComponentTransfer');
     gt.setAttribute('in', inputName);
     gt.setAttribute('result', 'gammaCorrected');
@@ -104,7 +89,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     funcR.setAttribute('amplitude', (1 + w * 0.12).toFixed(4));
     funcR.setAttribute('exponent', (1 - w * 0.08).toFixed(4));
     funcR.setAttribute('offset', (w * 0.01).toFixed(4));
-
 
     const funcG = document.createElementNS(SVG_NAMESPACE, 'feFuncG');
     funcG.setAttribute('type', 'gamma');
@@ -124,7 +108,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     gt.append(funcR, funcG, funcB, funcA);
     frag.appendChild(gt);
 
-    // Stage 2: Highlight color shift
     const highlightShift = document.createElementNS(SVG_NAMESPACE, 'feColorMatrix');
     highlightShift.setAttribute('in', 'gammaCorrected');
     highlightShift.setAttribute('type', 'matrix');
@@ -142,7 +125,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
 
     frag.appendChild(highlightShift);
 
-    // Stage 3: Final blend
     const finalGrade = document.createElementNS(SVG_NAMESPACE, 'feColorMatrix');
     finalGrade.setAttribute('in', 'highlightShifted');
     finalGrade.setAttribute('type', 'matrix');
@@ -162,7 +144,6 @@ function createCinematicWarmthElements(warmth, inputName, outputName) {
     return frag;
 }
 
-// create warmth elements based on mode
 function createWarmthElements(warmth, mode, inputName, outputName) {
     if (mode === 'cinematic') {
         return createCinematicWarmthElements(warmth, inputName, outputName);
@@ -170,33 +151,89 @@ function createWarmthElements(warmth, mode, inputName, outputName) {
     return createSimpleWarmthElement(warmth, inputName, outputName);
 }
 
+function createShadowBoostElements(shadowBoost, inputName, outputName) {
+    const frag = document.createDocumentFragment();
+    const strength = shadowBoost / 100;
 
+    const exponent = 1.0 - (strength * 0.65);
 
-function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
+    const amplitude = 1.0 - (strength * 0.03);
+
+    const offset = strength * 0.035;
+
+    const transfer = document.createElementNS(SVG_NAMESPACE, 'feComponentTransfer');
+    transfer.setAttribute('in', inputName);
+    transfer.setAttribute('result', outputName);
+
+    for (const channel of ['feFuncR', 'feFuncG', 'feFuncB']) {
+        const func = document.createElementNS(SVG_NAMESPACE, channel);
+        func.setAttribute('type', 'gamma');
+        func.setAttribute('amplitude', amplitude.toFixed(4));
+        func.setAttribute('exponent', exponent.toFixed(4));
+        func.setAttribute('offset', offset.toFixed(4));
+        transfer.appendChild(func);
+    }
+
+    const funcA = document.createElementNS(SVG_NAMESPACE, 'feFuncA');
+    funcA.setAttribute('type', 'identity');
+    transfer.appendChild(funcA);
+
+    frag.appendChild(transfer);
+    return frag;
+}
+
+function createShadowBoostSVG(filterId, shadowBoost) {
+    const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+    svg.setAttribute('xmlns', SVG_NAMESPACE);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.style.cssText = 'position:absolute;width:0;height:0;';
+
+    const filter = document.createElementNS(SVG_NAMESPACE, 'filter');
+    filter.setAttribute('id', filterId);
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    filter.setAttribute('x', '0');
+    filter.setAttribute('y', '0');
+    filter.setAttribute('width', '100%');
+    filter.setAttribute('height', '100%');
+
+    const elements = createShadowBoostElements(shadowBoost, 'SourceGraphic', 'shadowLifted');
+    filter.appendChild(elements);
+
+    svg.appendChild(filter);
+    return svg;
+}
+
+function updateSVGFilters(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE, shadowBoost = 0) {
     const normSharpness = clamp(Math.round(sharpness), 0, 100);
     const normWarmth = clamp(warmth, -100, 100);
+    const normShadowBoost = clamp(Math.round(shadowBoost), 0, 100);
     const normMode = warmthMode === 'cinematic' ? 'cinematic' : 'simple';
-    const needsFilter = normSharpness > 0 || Math.abs(normWarmth) > 0.5;
+    const needsMain = normSharpness > 0 || Math.abs(normWarmth) > 0.5;
+    const needsShadow = normShadowBoost > 0;
 
     if (normSharpness === state.currentSharpness &&
         normWarmth === state.currentWarmth &&
-        normMode === state.currentWarmthMode) {
-        return state.currentFilterId;
+        normMode === state.currentWarmthMode &&
+        normShadowBoost === state.currentShadowBoost) {
+        return { shadowId: state.currentShadowFilterId, mainId: state.currentMainFilterId };
     }
 
     let container = document.getElementById(SVG_CONTAINER_ID);
 
-    if (!needsFilter) {
+    if (!needsMain && !needsShadow) {
         container?.remove();
         state.currentSharpness = 0;
         state.currentWarmth = 0;
         state.currentWarmthMode = null;
-        state.currentFilterId = null;
-        return null;
+        state.currentShadowBoost = 0;
+        state.currentShadowFilterId = null;
+        state.currentMainFilterId = null;
+        return { shadowId: null, mainId: null };
     }
 
     if (!document.body) {
-        return null;
+        return { shadowId: null, mainId: null };
     }
 
     if (!container) {
@@ -206,38 +243,54 @@ function updateSVGFilter(sharpness, warmth, warmthMode = WARMTH_MODE.SIMPLE) {
         document.body.appendChild(container);
     }
 
-    const modePrefix = normMode === 'cinematic' ? 'c' : 's';
-    const filterId = `${SVG_FILTER_ID}-${modePrefix}${normWarmth.toFixed(0)}-sh${normSharpness}`;
-    const svg = createCombinedFilterSVG(filterId, normSharpness, normWarmth, normMode);
+    const fragment = document.createDocumentFragment();
+    let shadowFilterId = null;
+    let mainFilterId = null;
 
-    container.replaceChildren(svg);
+    if (needsShadow) {
+        shadowFilterId = `${SHADOW_FILTER_ID}-sb${normShadowBoost}`;
+        fragment.appendChild(createShadowBoostSVG(shadowFilterId, normShadowBoost));
+    }
+
+    if (needsMain) {
+        const modePrefix = normMode === 'cinematic' ? 'c' : 's';
+        mainFilterId = `${SVG_FILTER_ID}-${modePrefix}${normWarmth.toFixed(0)}-sh${normSharpness}`;
+        fragment.appendChild(createCombinedFilterSVG(mainFilterId, normSharpness, normWarmth, normMode));
+    }
+
+    container.replaceChildren(fragment);
 
     state.currentSharpness = normSharpness;
     state.currentWarmth = normWarmth;
     state.currentWarmthMode = normMode;
-    state.currentFilterId = filterId;
+    state.currentShadowBoost = normShadowBoost;
+    state.currentShadowFilterId = shadowFilterId;
+    state.currentMainFilterId = mainFilterId;
 
-    return filterId;
+    return { shadowId: shadowFilterId, mainId: mainFilterId };
 }
 
-// generate filter string for css
-function buildFilterString(values, svgFilterId) {
+function buildFilterString(values, shadowFilterId, mainFilterId) {
     const intensity = getNumericValue(values.intensity, 100) / 100;
     const brightness = 100 + (getNumericValue(values.brightness, 100) - 100) * intensity;
     const contrast = 100 + (getNumericValue(values.contrast, 100) - 100) * intensity;
     const saturate = 100 + (getNumericValue(values.saturate, 100) - 100) * intensity;
 
-    const filters = [
+    const filters = [];
+
+    if (shadowFilterId) filters.push(`url(#${shadowFilterId})`);
+
+    filters.push(
         `brightness(${brightness.toFixed(2)}%)`,
         `contrast(${contrast.toFixed(2)}%)`,
         `saturate(${saturate.toFixed(2)}%)`
-    ];
+    );
 
-    if (svgFilterId) filters.push(`url(#${svgFilterId})`);
+    if (mainFilterId) filters.push(`url(#${mainFilterId})`);
+
     return filters.join(' ');
 }
 
-// update style tag with filter rules
 function updateStyleElement(filterValue, enableImages) {
     let style = document.getElementById(STYLE_ID);
     if (!style) {
@@ -245,8 +298,6 @@ function updateStyleElement(filterValue, enableImages) {
         style.id = STYLE_ID;
     }
 
-    // Always ensure the style is in <head> when available (it may have been
-    // appended to documentElement at document_start before <head> existed)
     const target = document.head || document.documentElement;
     if (style.parentNode !== target) {
         target.appendChild(style);
@@ -269,7 +320,6 @@ function updateStyleElement(filterValue, enableImages) {
     `;
 }
 
-// apply all filters to the page
 function applyFilters(data) {
     try {
         if (!data || data.enabled === false) {
@@ -281,14 +331,17 @@ function applyFilters(data) {
         const rawValues = presets[data.activePreset || 'balanced'] || PRESET_DEFAULTS.balanced;
         const activeValues = { ...PRESET_DEFAULTS[data.activePreset || 'balanced'], ...rawValues };
 
-        const intensity = getNumericValue(activeValues.intensity, 100) / 100;
-        const sharpness = parseInt(activeValues.sharpness ?? 0, 10);
-        const warmth = getNumericValue(activeValues.warmth, 0) * intensity;
-        const warmthMode = activeValues.warmthMode || 'simple';
+        const validated = validatePreset(activeValues, data.activePreset || 'balanced');
+
+        const intensity = getNumericValue(validated.intensity, 100) / 100;
+        const sharpness = parseInt(validated.sharpness ?? 0, 10);
+        const warmth = getNumericValue(validated.warmth, 0) * intensity;
+        const warmthMode = validated.warmthMode || 'simple';
+        const shadowBoost = getNumericValue(validated.shadowBoost, 0) * intensity;
         const enableImages = data.enableImages ?? false;
 
-        const svgFilterId = updateSVGFilter(sharpness, warmth, warmthMode);
-        updateStyleElement(buildFilterString(activeValues, svgFilterId), enableImages);
+        const { shadowId, mainId } = updateSVGFilters(sharpness, warmth, warmthMode, shadowBoost);
+        updateStyleElement(buildFilterString(validated, shadowId, mainId), enableImages);
 
         state.isInitialized = true;
     } catch (error) {
@@ -302,27 +355,24 @@ function removeFilters() {
     state.currentSharpness = null;
     state.currentWarmth = null;
     state.currentWarmthMode = null;
-    state.currentFilterId = null;
+    state.currentShadowBoost = null;
+    state.currentShadowFilterId = null;
+    state.currentMainFilterId = null;
 }
 
-// Cache for iframe hostname resolution
 let _cachedIframeHostname = null;
 
 async function getHostnameAsync() {
-    // Top-level page: simply use location
     if (window.top === window.self) {
         return window.location.hostname.replace(/^www\./, '');
     }
-    // Iframe: try cached value first
     if (_cachedIframeHostname) return _cachedIframeHostname;
-    // Try document.referrer
     try {
         if (document.referrer) {
             _cachedIframeHostname = new URL(document.referrer).hostname.replace(/^www\./, '');
             return _cachedIframeHostname;
         }
     } catch (e) {}
-    // Ask background script for the tab's real URL
     try {
         const response = await browser.runtime.sendMessage({ type: 'GET_TAB_HOSTNAME' });
         if (response?.hostname) {
@@ -330,11 +380,9 @@ async function getHostnameAsync() {
             return _cachedIframeHostname;
         }
     } catch (e) {}
-    // Final fallback
     return window.location.hostname.replace(/^www\./, '');
 }
 
-// Synchronous version for non-critical paths (uses cache or fallback)
 function getHostname() {
     if (window.top === window.self) {
         return window.location.hostname.replace(/^www\./, '');
@@ -360,7 +408,7 @@ function resolveSettings(data, hostname) {
 
 function loadAndApplySettings(source = 'unknown') {
     Promise.all([
-        browser.storage.local.get(null),
+        browser.storage.local.get(STORAGE_KEYS),
         getHostnameAsync()
     ])
         .then(([data, hostname]) => {
@@ -460,15 +508,11 @@ function init() {
     initStorageListener();
     initMutationObserver();
 
-    // Always re-apply once the DOM is fully parsed to ensure filters are correct.
-    // At document_start, the initial apply may be partial (no <head>/<body> yet)
-    // or storage may return incomplete data.
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             loadAndApplySettings('DOMContentLoaded');
         }, { once: true });
     } else {
-        // DOMContentLoaded already fired, re-apply with a microtask delay
         setTimeout(() => loadAndApplySettings('fallback-timeout'), 0);
     }
 }

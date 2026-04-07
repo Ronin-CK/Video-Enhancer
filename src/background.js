@@ -1,8 +1,8 @@
+
 const DEFAULT_STATE = {
     enabled: true
 };
 
-// get hostname from url
 function getHostname(url) {
     if (!url) return null;
     try {
@@ -26,18 +26,18 @@ function updateBadge(enabled, tabId, isSiteOverride = false) {
 
     const details = { text };
     if (tabId) details.tabId = tabId;
-    browser.browserAction.setBadgeText(details);
+    browser.action.setBadgeText(details);
 
     const colorDetails = { color };
     if (tabId) colorDetails.tabId = tabId;
-    browser.browserAction.setBadgeBackgroundColor(colorDetails);
+    browser.action.setBadgeBackgroundColor(colorDetails);
 }
 
 async function updateBadgeForTab(tabId) {
     try {
         const [tab, stored] = await Promise.all([
             browser.tabs.get(tabId),
-            browser.storage.local.get(null)
+            browser.storage.local.get(STORAGE_KEYS)
         ]);
 
         if (!tab || !tab.url) return;
@@ -61,7 +61,6 @@ async function updateBadgeForTab(tabId) {
     }
 }
 
-// update badges for all tabs
 async function updateAllTabs() {
     const tabs = await browser.tabs.query({});
     for (const tab of tabs) {
@@ -71,14 +70,58 @@ async function updateAllTabs() {
     }
 }
 
-// update badge when storage changes
+browser.commands.onCommand.addListener(async (command) => {
+    if (command !== 'toggle-enhancer') return;
+
+    try {
+        const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+        if (!tab?.id) return;
+
+        const stored = await browser.storage.local.get(STORAGE_KEYS);
+        const hostname = getHostname(tab.url);
+
+        let currentEnabled;
+        let isSiteScope = false;
+
+        if (hostname && stored.siteSettings?.[hostname]) {
+            isSiteScope = true;
+            currentEnabled = stored.siteSettings[hostname].enabled ?? true;
+        } else {
+            currentEnabled = stored.enabled ?? true;
+        }
+
+        const newEnabled = !currentEnabled;
+
+        if (isSiteScope) {
+            stored.siteSettings[hostname].enabled = newEnabled;
+            await browser.storage.local.set({ siteSettings: stored.siteSettings });
+        } else {
+            await browser.storage.local.set({ enabled: newEnabled });
+        }
+
+        browser.tabs.sendMessage(tab.id, {
+            type: 'UPDATE_SETTINGS',
+            settings: {
+                ...stored,
+                enabled: newEnabled,
+                ...(isSiteScope ? stored.siteSettings[hostname] : {}),
+                enabled: newEnabled
+            },
+            ignoreStorage: true
+        }).catch(() => {});
+
+        updateBadgeForTab(tab.id);
+    } catch (e) {
+        console.error('Video Enhancer Toggle Error:', e);
+    }
+});
+
 browser.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
         updateAllTabs();
     }
 });
 
-// tab events
 browser.tabs.onActivated.addListener((activeInfo) => {
     updateBadgeForTab(activeInfo.tabId);
 });

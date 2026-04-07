@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+
+    <!-- restricted page banner -->
+    <div class="restricted-banner" id="restricted-banner">
+        <span class="restricted-icon">🚫</span>
+        <span>Not available on this page</span>
+    </div>
+
+    <!-- toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- main content wrapper -->
+    <div id="main-content">
+
+        <!-- header -->
+        <div class="header">
+            <div class="title">Video Enhancer</div>
+            <label class="toggle">
+                <input type="checkbox" id="enabled-toggle">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+            </label>
+        </div>
+
+        <!-- settings scope -->
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-global">Global Defaults</button>
+            <button class="tab-btn" id="tab-site">Current Site</button>
+        </div>
+
+        <!-- image enhancement -->
+        <div class="section" style="margin-bottom: 12px;">
+            <div class="control-header">
+                <span class="control-label"
+                    style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Enhance Images</span>
+                <label class="toggle" style="transform: scale(0.8); margin-right: -4px;">
+                    <input type="checkbox" id="images-toggle">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- presets -->
+        <div class="section">
+            <div class="section-label">Presets</div>
+            <div class="preset-grid">
+                <div class="preset-item" data-preset="anime">
+                    <button class="preset-btn">Anime</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+                <div class="preset-item" data-preset="balanced">
+                    <button class="preset-btn">Balanced</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+                <div class="preset-item" data-preset="vivid">
+                    <button class="preset-btn">Vivid</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+                <div class="preset-item" data-preset="cinema">
+                    <button class="preset-btn">Cinema</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+                <div class="preset-item" data-preset="gaming">
+                    <button class="preset-btn">Gaming</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+                <div class="preset-item" data-preset="warm">
+                    <button class="preset-btn">Warm</button>
+                    <button class="preset-reset" title="Reset to default">↺</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- adjustments -->
+        <div class="section">
+            <div class="section-label">Adjustments</div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Brightness</span>
+                    <span class="control-value" id="brightness-value">100%</span>
+                </div>
+                <input type="range" id="brightness" min="50" max="150" value="100">
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Contrast</span>
+                    <span class="control-value" id="contrast-value">100%</span>
+                </div>
+                <input type="range" id="contrast" min="50" max="200" value="100">
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Saturation</span>
+                    <span class="control-value" id="saturate-value">100%</span>
+                </div>
+                <input type="range" id="saturate" min="50" max="200" value="100">
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Warmth</span>
+                    <span class="control-value" id="warmth-value">0°</span>
+                </div>
+                <input type="range" id="warmth" min="-30" max="30" value="0">
+            </div>
+
+            <!-- warmth style -->
+            <div class="control sub-control" id="warmth-mode-container">
+                <div class="control-header">
+                    <span class="control-label">
+                        Warmth Style
+                        <span class="mode-badge" id="warmth-mode-badge">Simple</span>
+                    </span>
+                </div>
+                <select class="control-select" id="warmthMode">
+                    <option value="simple">Simple — Uniform color shift</option>
+                    <option value="cinematic">Cinematic — Warm highlights, cool shadows</option>
+                </select>
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Intensity</span>
+                    <span class="control-value" id="intensity-value">100%</span>
+                </div>
+                <input type="range" id="intensity" min="0" max="100" value="100">
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Sharpness</span>
+                    <span class="control-value" id="sharpness-value">0%</span>
+                </div>
+                <input type="range" id="sharpness" min="0" max="100" value="0">
+            </div>
+
+            <div class="control">
+                <div class="control-header">
+                    <span class="control-label">Shadow Boost
+                        <span class="hint-text">Dark detail recovery</span>
+                    </span>
+                    <span class="control-value" id="shadowBoost-value">Off</span>
+                </div>
+                <input type="range" id="shadowBoost" min="0" max="100" value="0">
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- import / export -->
+        <div class="section io-section">
+            <div class="io-buttons">
+                <button class="io-btn" id="btn-export" title="Export settings to file">
+                    <span class="io-icon">↗</span> Export
+                </button>
+                <button class="io-btn" id="btn-import" title="Import settings from file">
+                    <span class="io-icon">↙</span> Import
+                </button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Changes apply instantly · <kbd>Alt+Shift+V</kbd> to toggle
+        </div>
+
+    </div>
+
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+</body>
+
+</html>

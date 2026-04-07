@@ -263,6 +263,16 @@ body {
     outline-offset: 2px;
 }
 
+/* preset reset flash animation */
+@keyframes resetFlash {
+    0% { background: rgba(76, 175, 80, 0.4); }
+    100% { background: var(--surface-color); }
+}
+
+.preset-btn.reset-flash {
+    animation: resetFlash 0.6s ease-out;
+}
+
 .preset-rename-input {
     width: 100%;
     padding: 0;
@@ -302,6 +312,14 @@ body {
     color: var(--subtle-text);
 }
 
+.hint-text {
+    display: block;
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 1px;
+    letter-spacing: 0.3px;
+}
+
 .control-value {
     font-size: 12px;
     font-family: 'SF Mono', Monaco, monospace;
@@ -318,6 +336,8 @@ input[type="range"] {
     outline: none;
     -webkit-appearance: none;
     appearance: none;
+    cursor: pointer;
+    transition: background 0.1s;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -347,9 +367,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 input[type="range"]::-moz-range-track {
-    background: var(--surface-color);
+    background: transparent;
     height: 6px;
     border-radius: 3px;
+}
+
+/* firefox slider fill (left side of thumb) */
+input[type="range"]::-moz-range-progress {
+    background: var(--accent-color);
+    height: 6px;
+    border-radius: 3px 0 0 3px;
+}
+
+/* warmth slider special — disable the progress bar since we use full gradient */
+input[type="range"]#warmth::-moz-range-progress {
+    background: transparent;
 }
 
 .control-select {
@@ -437,9 +469,123 @@ input[type="range"]::-moz-range-track {
     letter-spacing: 0.5px;
 }
 
+/* import / export buttons */
+.io-section {
+    margin-bottom: 8px;
+}
+
+.io-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.io-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--subtle-text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.io-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+    border-color: var(--surface-hover);
+}
+
+.io-btn:active {
+    transform: scale(0.97);
+}
+
+.io-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.io-icon {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* toast notification */
+.toast {
+    position: fixed;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-color);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.toast.visible {
+    bottom: 12px;
+    opacity: 1;
+}
+
+/* restricted page banner */
+.restricted-banner {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 8px;
+    color: #f44336;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.restricted-banner.visible {
+    display: flex;
+}
+
+.restricted-icon {
+    font-size: 16px;
+}
+
+/* dim main content when restricted */
+#main-content.restricted {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+/* footer */
 .footer {
     margin-top: 16px;
     text-align: center;
     font-size: 10px;
+    color: var(--subtle-text);
+}
+
+.footer kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--surface-color);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 9px;
     color: var(--subtle-text);
 }
