@@ -1,4 +1,6 @@
-# Video Enhancer
+<div align="center">
+  <img src="src/icon.svg" width="70" height="70" alt="Video Enhancer Logo">
+  <h1>Video Enhancer</h1>
 
 <div align="center">
 
