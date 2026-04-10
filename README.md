@@ -4,7 +4,7 @@
 
 [![Firefox Add-on](https://img.shields.io/amo/v/video-enhancer?label=Firefox%20Add-on&logo=firefox&logoColor=white&style=for-the-badge)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 
-[![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v3.3.0-4285F4?logo=googlechrome&logoColor=white&style=for-the-badge)](#)
+[![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v3.3.1-4285F4?logo=googlechrome&logoColor=white&style=for-the-badge)](#)
 [![Mozilla Add-on Users](https://img.shields.io/amo/users/video-enhancer?style=for-the-badge&logo=firefox&logoColor=white&label=Users)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 [![License](https://img.shields.io/badge/License-All_Rights_Reserved-red.svg?style=for-the-badge)](LICENSE)
 
