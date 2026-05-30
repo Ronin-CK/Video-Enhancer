@@ -5,6 +5,7 @@
  */
 
 const STYLE_ID = 'firefox-hdr-optimizer-style';
+const IMAGE_STYLE_ID = 'firefox-hdr-optimizer-image-style';
 const SVG_FILTER_ID = 'video-enhancer-filter';
 const SVG_CONTAINER_ID = 'video-enhancer-svg-container';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -297,33 +298,56 @@ function buildFilterString(values, shadowFilterId, mainFilterId) {
     return filters.join(' ');
 }
 
-function updateStyleElement(filterValue, enableImages) {
-    let style = document.getElementById(STYLE_ID);
-    if (!style) {
-        style = document.createElement('style');
-        style.id = STYLE_ID;
-    }
+let _lastVideoFilter = null;
+let _lastEnableImages = null;
+let _lastFilterValue = null;
+
+function updateVideoStyle(filterValue) {
+    if (filterValue === _lastVideoFilter) return;
 
     const target = document.head || document.documentElement;
-    if (style.parentNode !== target) {
-        target.appendChild(style);
+    let videoStyle = document.getElementById(STYLE_ID);
+    if (!videoStyle) {
+        videoStyle = document.createElement('style');
+        videoStyle.id = STYLE_ID;
     }
-
-    const imageFilter = enableImages ? `${filterValue} !important` : 'none !important';
-
-    style.textContent = `
+    if (videoStyle.parentNode !== target) {
+        target.appendChild(videoStyle);
+    }
+    videoStyle.textContent = `
         video, .html5-main-video, .video-stream, .html5-video-player video,
         [class*="player"] video, [data-player] video {
             filter: ${filterValue} !important;
         }
+    `;
+    _lastVideoFilter = filterValue;
+}
 
-        img, picture, svg:not(#${SVG_CONTAINER_ID} svg), [role="img"],
-        ytd-thumbnail, .ytp-videowall-still-image, yt-image, yt-img-shadow,
-        .thumbnail, [class*="thumbnail"], [class*="poster"],
-        [style*="url"] {
+function updateImageStyle(enableImages, filterValue) {
+    if (enableImages === _lastEnableImages && filterValue === _lastFilterValue) return;
+
+    const imageFilter = enableImages ? `${filterValue} !important` : 'none !important';
+
+    const target = document.head || document.documentElement;
+    let imgStyle = document.getElementById(IMAGE_STYLE_ID);
+    if (!imgStyle) {
+        imgStyle = document.createElement('style');
+        imgStyle.id = IMAGE_STYLE_ID;
+    }
+    if (imgStyle.parentNode !== target) {
+        target.appendChild(imgStyle);
+    }
+    imgStyle.textContent = `
+        img:not(video img):not(.html5-video-player img):not([class*="player"] img),
+        picture:not(video picture):not(.html5-video-player picture):not([class*="player"] picture),
+        [role="img"]:not(.html5-video-player [role="img"]):not([class*="player"] [role="img"]),
+        ytd-thumbnail, .ytp-videowall-still-image,
+        yt-image, yt-img-shadow {
             filter: ${imageFilter};
         }
     `;
+    _lastEnableImages = enableImages;
+    _lastFilterValue = filterValue;
 }
 
 function applyFilters(data) {
@@ -347,7 +371,15 @@ function applyFilters(data) {
         const enableImages = data.enableImages ?? false;
 
         const { shadowId, mainId } = updateSVGFilters(sharpness, warmth, warmthMode, shadowBoost);
-        updateStyleElement(buildFilterString(validated, shadowId, mainId), enableImages);
+        const filterValue = buildFilterString(validated, shadowId, mainId);
+
+        // Only update video style if the filter value actually changed
+        if (filterValue !== _lastFilterValue) {
+            updateVideoStyle(filterValue);
+        }
+
+        // Always update image style (it has its own internal check)
+        updateImageStyle(enableImages, filterValue);
 
         state.isInitialized = true;
     } catch (error) {
@@ -357,7 +389,11 @@ function applyFilters(data) {
 
 function removeFilters() {
     document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(IMAGE_STYLE_ID)?.remove();
     document.getElementById(SVG_CONTAINER_ID)?.remove();
+    _lastVideoFilter = null;
+    _lastEnableImages = null;
+    _lastFilterValue = null;
     state.currentSharpness = null;
     state.currentWarmth = null;
     state.currentWarmthMode = null;

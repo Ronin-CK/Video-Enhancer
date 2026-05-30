@@ -5,15 +5,641 @@
 -->
 
 <!DOCTYPE html>
-<html>
+<html style="width: 330px; height: 580px; min-width: 330px; max-width: 330px; min-height: 580px; max-height: 580px; overflow: hidden; margin: 0; padding: 0;">
 
 <head>
     <meta charset="UTF-8">
     <meta name="color-scheme" content="light dark">
-    <link rel="stylesheet" href="popup.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body.preload * {
+            transition: none !important;
+        }
+
+        /* mobile optimization: override inline fixed dimensions for phones */
+        @media (hover: none) {
+            html, body, #main-content {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                min-height: 100% !important;
+                max-height: 100% !important;
+                border-radius: 0 !important;
+            }
+            body {
+                font-size: 15px !important;
+                padding: 20px !important;
+            }
+            .preset-btn {
+                padding: 10px 4px !important;
+            }
+            .control-header {
+                margin-bottom: 12px !important;
+            }
+            input[type="range"] {
+                height: 24px !important;
+            }
+        }
+/*
+ * Copyright (c) 2026 Chandra Kant (Ronin-CK)
+ * All Rights Reserved.
+ * This product and its source code are proprietary.
+ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    background-color: var(--bg-color);
+}
+
+:root {
+    color-scheme: light dark;
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --surface-color: #f0f0f4;
+    --surface-hover: #e0e0e4;
+    --accent-color: #4CAF50;
+    --border-color: #dcdce0;
+    --subtle-text: #666666;
+    --warning-color: #ff9800;
+    --warning-hover: #f57c00;
+    --overlay-hover: rgba(0, 0, 0, 0.05);
+    --overlay-active: rgba(0, 0, 0, 0.08);
+    --toggle-thumb-bg: #ffffff;
+    --slider-thumb-bg: #ffffff;
+    --toggle-thumb-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #121212;
+        --text-color: #ffffff;
+        --surface-color: #2d2d2d;
+        --surface-hover: #3e3e3e;
+        --accent-color: #4CAF50;
+        --border-color: #404040;
+        --subtle-text: #bbbbbb;
+        --overlay-hover: rgba(255, 255, 255, 0.05);
+        --overlay-active: rgba(255, 255, 255, 0.08);
+        --toggle-thumb-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        --slider-thumb-bg: var(--surface-hover);
+    }
+}
+
+/* base styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.title {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+
+
+/* Toggle */
+.toggle {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-color);
+    border-radius: 26px;
+    transition: background 0.2s;
+    border: 1px solid var(--border-color);
+}
+
+.toggle input:checked+.toggle-track {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: var(--toggle-thumb-bg);
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: var(--toggle-thumb-shadow);
+    border: 1px solid var(--border-color);
+}
+
+.toggle input:checked~.toggle-thumb {
+    transform: translateX(22px);
+    border-color: transparent;
+}
+
+.toggle input:focus-visible~.toggle-thumb {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    background: var(--surface-color);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 16px;
+    gap: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    color: var(--subtle-text);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-btn:hover:not(:disabled) {
+    color: var(--text-color);
+    background: var(--overlay-hover);
+}
+
+.tab-btn.active {
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-shadow: var(--card-shadow);
+}
+
+.tab-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tab-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* presets */
+.section {
+    margin-bottom: 16px;
+}
+
+.section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--subtle-text);
+    margin-bottom: 8px;
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+
+.preset-reset {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 50%;
+    background: var(--warning-color);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preset-reset:hover {
+    background: var(--warning-hover);
+}
+
+.preset-item.modified .preset-reset {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.preset-reset:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.preset-item {
+    position: relative;
+}
+
+.preset-btn {
+    width: 100%;
+    padding: 10px 6px;
+    border: 2px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--text-color);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.preset-btn:hover {
+    border-color: var(--surface-hover);
+    background: var(--surface-hover);
+}
+
+.preset-btn.active {
+    border-color: var(--accent-color);
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--accent-color);
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.3);
+}
+
+.preset-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* preset reset flash animation */
+@keyframes resetFlash {
+    0% { background: rgba(76, 175, 80, 0.4); }
+    100% { background: var(--surface-color); }
+}
+
+.preset-btn.reset-flash {
+    animation: resetFlash 0.6s ease-out;
+}
+
+.preset-rename-input {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: center;
+    outline: none;
+    font-family: inherit;
+}
+
+
+
+.divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+    margin: 16px 0;
+}
+
+/* manual adjustments */
+.control {
+    margin-bottom: 14px;
+}
+
+.control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.control-label {
+    font-size: 12px;
+    color: var(--subtle-text);
+}
+
+.hint-text {
+    display: block;
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 1px;
+    letter-spacing: 0.3px;
+}
+
+.control-value {
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--accent-color);
+    min-width: 45px;
+    text-align: right;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-color);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--slider-thumb-bg);
+    border: 2px solid var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--slider-thumb-bg);
+    border: 2px solid var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+}
+
+input[type="range"]::-moz-range-track {
+    background: transparent;
+    height: 6px;
+    border-radius: 3px;
+}
+
+/* firefox slider fill (left side of thumb) */
+input[type="range"]::-moz-range-progress {
+    background: var(--accent-color);
+    height: 6px;
+    border-radius: 3px 0 0 3px;
+}
+
+/* warmth slider special — disable the progress bar since we use full gradient */
+input[type="range"]#warmth::-moz-range-progress {
+    background: transparent;
+}
+
+.control-select {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--surface-color);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-color);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .control-select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23bbbbbb' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    }
+}
+
+.control-select:hover {
+    border-color: var(--surface-hover);
+}
+
+.control-select:focus {
+    border-color: var(--accent-color);
+}
+
+.control-select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.control-select:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.control-select option {
+    background: var(--bg-color);
+    color: var(--text-color);
+    padding: 8px;
+}
+
+.control.sub-control {
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border-color);
+    margin-bottom: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 100px;
+    opacity: 1;
+    overflow: hidden;
+}
+
+.control.sub-control.disabled {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 0;
+    pointer-events: none;
+    border-left-color: transparent;
+}
+
+.control.sub-control .control-label {
+    font-size: 11px;
+}
+
+.mode-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(76, 175, 80, 0.2);
+    border-radius: 4px;
+    font-size: 9px;
+    color: var(--accent-color);
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* import / export buttons */
+.io-section {
+    margin-bottom: 8px;
+}
+
+.io-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.io-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--subtle-text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.io-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+    border-color: var(--surface-hover);
+}
+
+.io-btn:active {
+    transform: scale(0.97);
+}
+
+.io-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.io-icon {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* toast notification */
+.toast {
+    position: fixed;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-color);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.toast.visible {
+    bottom: 12px;
+    opacity: 1;
+}
+
+/* restricted page banner */
+.restricted-banner {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 8px;
+    color: #f44336;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.restricted-banner.visible {
+    display: flex;
+}
+
+.restricted-icon {
+    font-size: 16px;
+}
+
+/* dim main content when restricted */
+#main-content.restricted {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+/* footer */
+.footer {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--subtle-text);
+}
+
+.footer kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--surface-color);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 9px;
+    color: var(--subtle-text);
+}
+</style>
 </head>
 
-<body>
+<body class="preload" style="width: 330px; height: 580px; min-width: 330px; max-width: 330px; min-height: 580px; max-height: 580px; margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-color);">
+    <!-- main scrollable wrapper to prevent body resizing -->
+    <div id="main-content" style="width: 330px; height: 580px; overflow-y: auto; overflow-x: hidden; padding: 16px; box-sizing: border-box;">
 
     <!-- restricted page banner -->
     <div class="restricted-banner" id="restricted-banner">
@@ -68,7 +694,7 @@
                     <button class="preset-reset" title="Reset to default">↺</button>
                 </div>
                 <div class="preset-item" data-preset="balanced">
-                    <button class="preset-btn">Balanced</button>
+                    <button class="preset-btn active">Balanced</button>
                     <button class="preset-reset" title="Reset to default">↺</button>
                 </div>
                 <div class="preset-item" data-preset="vivid">
@@ -99,25 +725,25 @@
             <div class="control">
                 <div class="control-header">
                     <span class="control-label">Brightness</span>
-                    <span class="control-value" id="brightness-value">100%</span>
+                    <span class="control-value" id="brightness-value">105%</span>
                 </div>
-                <input type="range" id="brightness" min="50" max="150" value="100">
+                <input type="range" id="brightness" min="50" max="150" value="105">
             </div>
 
             <div class="control">
                 <div class="control-header">
                     <span class="control-label">Contrast</span>
-                    <span class="control-value" id="contrast-value">100%</span>
+                    <span class="control-value" id="contrast-value">115%</span>
                 </div>
-                <input type="range" id="contrast" min="50" max="200" value="100">
+                <input type="range" id="contrast" min="50" max="200" value="115">
             </div>
 
             <div class="control">
                 <div class="control-header">
                     <span class="control-label">Saturation</span>
-                    <span class="control-value" id="saturate-value">100%</span>
+                    <span class="control-value" id="saturate-value">120%</span>
                 </div>
-                <input type="range" id="saturate" min="50" max="200" value="100">
+                <input type="range" id="saturate" min="50" max="200" value="120">
             </div>
 
             <div class="control">
@@ -129,7 +755,7 @@
             </div>
 
             <!-- warmth style -->
-            <div class="control sub-control" id="warmth-mode-container">
+            <div class="control sub-control disabled" id="warmth-mode-container">
                 <div class="control-header">
                     <span class="control-label">
                         Warmth Style
@@ -145,15 +771,15 @@
             <div class="control">
                 <div class="control-header">
                     <span class="control-label">Intensity</span>
-                    <span class="control-value" id="intensity-value">100%</span>
+                    <span class="control-value" id="intensity-value">50%</span>
                 </div>
-                <input type="range" id="intensity" min="0" max="100" value="100">
+                <input type="range" id="intensity" min="0" max="100" value="50">
             </div>
 
             <div class="control">
                 <div class="control-header">
                     <span class="control-label">Sharpness</span>
-                    <span class="control-value" id="sharpness-value">0%</span>
+                    <span class="control-value" id="sharpness-value">Off</span>
                 </div>
                 <input type="range" id="sharpness" min="0" max="100" value="0">
             </div>
@@ -187,6 +813,7 @@
             Changes apply instantly · <kbd>Alt+Shift+V</kbd> to toggle
         </div>
 
+    </div>
     </div>
 
     <script src="shared.js"></script>

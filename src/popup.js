@@ -571,6 +571,12 @@ async function init() {
     updateAllUI();
     attachEventListeners();
     checkRestrictedPage();
+    
+    // Remove preload class after a short delay to re-enable transitions
+    // This prevents "CSS transition flash" on load which causes window jitter on Linux Wayland.
+    setTimeout(() => {
+        document.body.classList.remove('preload');
+    }, 100);
 }
 
 init();
