@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Chandra Kant (Ronin-CK)
  * All Rights Reserved.
- * This product and its source code are proprietary.
+ * Tactical Flat Neo-Anime Logic
  */
-
 
 let currentPresetName = DEFAULT_ACTIVE_PRESET;
 let currentScope = 'global';
+let activeTabId = null;
 
 let state = {
     enabled: true,
@@ -15,10 +15,13 @@ let state = {
     siteSettings: {},
     globalSettings: null,
     enableImages: false,
-    presetNames: { ...DEFAULT_PRESET_NAMES }
+    presetNames: { ...DEFAULT_PRESET_NAMES },
+    performanceMode: false,
+    aspectRatio: 'default',
+    audioBoost: 100,
+    audioCompressor: false,
+    themeColor: '#ff9800'
 };
-
-function getEl(id) { return document.getElementById(id); }
 
 function debounce(func, wait) {
     let timeout;
@@ -28,29 +31,65 @@ function debounce(func, wait) {
     };
 }
 
-function isPresetModified(presetName) {
-    const current = state.presets[presetName];
-    const factory = PRESET_DEFAULTS[presetName];
-    if (!current || !factory) return false;
-    return ALL_SETTING_KEYS.some(key => current[key] !== factory[key]);
+async function getActiveTab() {
+    const isWebTab = (t) => t && t.id && (!t.url || (!t.url.startsWith('chrome-extension://') && !t.url.startsWith('moz-extension://')));
+
+    try {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const valid = tabs?.find(isWebTab);
+        if (valid) return valid;
+    } catch (e) {
+        // Ignored, fallback below
+    }
+
+    try {
+        const lastFocused = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+        const valid = lastFocused?.find(isWebTab);
+        if (valid) return valid;
+    } catch (e) {
+        // Ignored
+    }
+
+    try {
+        const anyActive = await browser.tabs.query({ active: true });
+        const valid = anyActive?.find(isWebTab);
+        if (valid) return valid;
+    } catch (e) {
+        // Ignored
+    }
+
+    try {
+        const allTabs = await browser.tabs.query({});
+        const valid = allTabs?.find(isWebTab);
+        if (valid) return valid;
+    } catch (e) {
+        // Ignored
+    }
+
+    return null;
 }
 
 async function getCurrentHostname() {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const tab = await getActiveTab();
+    if (tab?.id) {
+        activeTabId = tab.id;
+    }
     if (tab?.url) {
         try {
             const url = new URL(tab.url);
             if (url.protocol.startsWith('http')) {
                 return url.hostname.replace(/^www\./, '');
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+        }
     }
     return null;
 }
 
 async function isRestrictedPage() {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.url) return true;
+    const tab = await getActiveTab();
+    if (!tab?.url) return false;
     const url = tab.url;
     return !url.startsWith('http://') && !url.startsWith('https://');
 }
@@ -65,6 +104,8 @@ async function loadState() {
         state.hostname = hostname;
         state.siteSettings = stored.siteSettings || {};
         state.presetNames = { ...DEFAULT_PRESET_NAMES, ...(stored.presetNames || {}) };
+        state.themeColor = stored.themeColor || '#ff9800';
+        applyThemeColor(state.themeColor, false);
 
         loadSettingsFromData(stored);
 
@@ -72,24 +113,37 @@ async function loadState() {
             enabled: state.enabled,
             enableImages: state.enableImages,
             activePreset: currentPresetName,
-            presets: deepClone(state.presets)
+            presets: deepClone(state.presets),
+            performanceMode: state.performanceMode,
+            aspectRatio: state.aspectRatio,
+            audioBoost: state.audioBoost,
+            audioCompressor: state.audioCompressor,
+            enableHud: state.enableHud,
+            hudFullscreenOnly: state.hudFullscreenOnly
         };
 
         if (hostname && state.siteSettings[hostname]) {
             currentScope = 'site';
+            const globalEnableImages = state.enableImages;
             loadSettingsFromData(state.siteSettings[hostname]);
+            if (state.siteSettings[hostname].enableImages === undefined) {
+                state.enableImages = globalEnableImages;
+            }
         }
 
+        const siteLabel = document.getElementById('tab-site-label');
         const siteTab = document.getElementById('tab-site');
-        if (siteTab) {
-            siteTab.textContent = hostname || "No Site";
+        if (siteLabel && siteTab) {
+            siteLabel.textContent = hostname ? hostname.toUpperCase() : 'NO SITE';
             siteTab.disabled = !hostname;
         }
 
     } catch (e) {
-        console.error(e);
+        console.error('Video Enhancer Load State Error:', e);
         state.enabled = true;
         state.enableImages = false;
+        state.enableHud = true;
+        state.hudFullscreenOnly = false;
         currentPresetName = DEFAULT_ACTIVE_PRESET;
         state.presets = deepClone(PRESET_DEFAULTS);
     }
@@ -98,23 +152,27 @@ async function loadState() {
 function loadSettingsFromData(data) {
     state.enabled = data.enabled ?? true;
     state.enableImages = data.enableImages ?? false;
-    currentPresetName = data.activePreset || DEFAULT_ACTIVE_PRESET;
+    state.performanceMode = data.performanceMode ?? false;
+    state.aspectRatio = data.aspectRatio || 'default';
+    state.audioBoost = parseInt(data.audioBoost || 100, 10);
+    state.audioCompressor = data.audioCompressor ?? false;
+    state.enableHud = data.enableHud ?? true;
+    state.hudFullscreenOnly = data.hudFullscreenOnly ?? false;
 
-    if (!PRESET_DEFAULTS[currentPresetName]) {
-        currentPresetName = DEFAULT_ACTIVE_PRESET;
+    if (data.activePreset === 'warm') {
+        currentPresetName = 'image';
+    } else {
+        currentPresetName = data.activePreset || DEFAULT_ACTIVE_PRESET;
     }
 
     if (data.presets) {
         state.presets = validateAllPresets(data.presets);
-        for (const name of Object.keys(PRESET_DEFAULTS)) {
-            if (data.presets[name]?.name) {
-                state.presets[name].name = data.presets[name].name;
-            } else {
-                state.presets[name].name = PRESET_DEFAULTS[name]?.name || DEFAULT_PRESET_NAMES[name];
-            }
-        }
     } else {
         state.presets = deepClone(PRESET_DEFAULTS);
+    }
+
+    if (!state.presets[currentPresetName]) {
+        currentPresetName = DEFAULT_ACTIVE_PRESET;
     }
 }
 
@@ -123,7 +181,14 @@ function saveState() {
         enabled: state.enabled,
         enableImages: state.enableImages,
         activePreset: currentPresetName,
-        presets: state.presets
+        presets: state.presets,
+        performanceMode: state.performanceMode,
+        aspectRatio: state.aspectRatio,
+        audioBoost: state.audioBoost,
+        audioCompressor: state.audioCompressor,
+        presetNames: state.presetNames,
+        enableHud: state.enableHud ?? true,
+        hudFullscreenOnly: state.hudFullscreenOnly ?? false
     };
 
     if (currentScope === 'global') {
@@ -132,8 +197,13 @@ function saveState() {
     } else if (currentScope === 'site' && state.hostname) {
         if (!state.siteSettings) state.siteSettings = {};
         state.siteSettings[state.hostname] = data;
-        browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
+        browser.storage.local.set({
+            siteSettings: state.siteSettings,
+            enableImages: state.enableImages
+        }).catch(console.error);
     }
+
+    updateTabsUI();
 }
 
 function switchScope(newScope) {
@@ -144,18 +214,18 @@ function switchScope(newScope) {
 
     if (newScope === 'site') {
         const siteData = state.siteSettings[state.hostname];
-        if (siteData) loadSettingsFromData(siteData);
-    } else {
-        if (state.hostname && state.siteSettings[state.hostname]) {
-            delete state.siteSettings[state.hostname];
-            browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
+        if (siteData) {
+            const currentImgSetting = state.enableImages;
+            loadSettingsFromData(siteData);
+            if (siteData.enableImages === undefined) {
+                state.enableImages = currentImgSetting;
+            }
+        } else if (state.globalSettings) {
+            loadSettingsFromData(state.globalSettings);
         }
-
+    } else {
         if (state.globalSettings) {
-            state.enabled = state.globalSettings.enabled;
-            state.enableImages = state.globalSettings.enableImages;
-            currentPresetName = state.globalSettings.activePreset;
-            state.presets = deepClone(state.globalSettings.presets);
+            loadSettingsFromData(state.globalSettings);
         } else {
             loadState();
             return;
@@ -165,26 +235,158 @@ function switchScope(newScope) {
     broadcastChanges();
 }
 
+function resetSiteOverride() {
+    if (state.hostname && state.siteSettings[state.hostname]) {
+        delete state.siteSettings[state.hostname];
+        browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
+
+        if (state.globalSettings) {
+            loadSettingsFromData(state.globalSettings);
+        }
+        updateAllUI();
+        broadcastChanges();
+        showToast('SITE OVERRIDE REMOVED');
+    }
+}
+
 function updateToggleUI() {
     const toggle = document.getElementById('enabled-toggle');
     if (toggle) toggle.checked = state.enabled;
 
     const imgToggle = document.getElementById('images-toggle');
     if (imgToggle) imgToggle.checked = state.enableImages;
+
+    const perfToggle = document.getElementById('performance-toggle');
+    if (perfToggle) perfToggle.checked = state.performanceMode;
+
+    const compToggle = document.getElementById('compressor-toggle');
+    if (compToggle) compToggle.checked = state.audioCompressor;
+
+    const hudToggle = document.getElementById('hud-toggle');
+    if (hudToggle) hudToggle.checked = state.enableHud ?? true;
+
+    const aspectSelect = document.getElementById('aspectRatio');
+    if (aspectSelect) aspectSelect.value = state.aspectRatio || 'default';
+
+    const audioSlider = document.getElementById('audioBoost');
+    if (audioSlider) {
+        audioSlider.value = state.audioBoost || 100;
+        updateSliderFill(audioSlider);
+        const audioVal = document.getElementById('audioBoost-value');
+        if (audioVal) audioVal.textContent = `${state.audioBoost}%`;
+    }
+}
+
+function renderPresetButtons() {
+    const grid = document.getElementById('preset-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    const allKeys = Object.keys(state.presets);
+
+    allKeys.forEach(key => {
+        const isCustom = !PRESET_DEFAULTS[key];
+        const displayName = (state.presetNames[key] || DEFAULT_PRESET_NAMES[key] || key).toUpperCase();
+
+        const item = document.createElement('div');
+        item.className = `preset-item ${isCustom ? 'custom-item' : ''}`;
+        item.dataset.preset = key;
+
+        const btn = document.createElement('button');
+        btn.className = `skew-btn preset-btn ${key === currentPresetName ? 'active' : ''}`;
+        const span = document.createElement('span');
+        span.className = 'unskew';
+        span.textContent = displayName;
+        btn.appendChild(span);
+        btn.title = 'Click to activate · Right-click to rename';
+        btn.addEventListener('click', handlePresetClick);
+        btn.addEventListener('contextmenu', handlePresetRightClick);
+
+        item.appendChild(btn);
+
+        if (isCustom) {
+            const delBtn = document.createElement('button');
+            delBtn.className = 'preset-action-btn preset-delete';
+            delBtn.title = 'Delete custom preset';
+            delBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width:9px;height:9px;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;fill:none;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            delBtn.addEventListener('click', (e) => handlePresetDelete(e, key));
+            item.appendChild(delBtn);
+        }
+
+        grid.appendChild(item);
+    });
 }
 
 function updatePresetButtonsUI() {
-    document.querySelectorAll('.preset-item').forEach(item => {
-        const key = item.dataset.preset;
+    const grid = document.getElementById('preset-grid');
+    if (!grid) return;
+    const items = grid.querySelectorAll('.preset-item');
+    if (items.length !== Object.keys(state.presets).length) {
+        renderPresetButtons();
+        return;
+    }
+    items.forEach(item => {
         const btn = item.querySelector('.preset-btn');
-        if (!btn) return;
-
-        const displayName = state.presetNames[key] || DEFAULT_PRESET_NAMES[key] || key;
-        btn.textContent = displayName;
-
-        btn.classList.toggle('active', key === currentPresetName);
-        item.classList.toggle('modified', isPresetModified(key));
+        if (btn) {
+            btn.classList.toggle('active', item.dataset.preset === currentPresetName);
+        }
     });
+}
+
+function handleCreateCustomPreset() {
+    const customId = `custom_${Date.now()}`;
+    const baseVals = state.presets[currentPresetName] || PRESET_DEFAULTS.balanced;
+    const newPreset = deepClone(baseVals);
+
+    const count = Object.keys(state.presets).filter(k => !PRESET_DEFAULTS[k]).length + 1;
+    const newName = `Custom ${count}`;
+
+    state.presets[customId] = newPreset;
+    state.presetNames[customId] = newName;
+    currentPresetName = customId;
+
+    browser.storage.local.set({ presetNames: state.presetNames }).catch(console.error);
+    saveState();
+    updateAllUI();
+    broadcastChanges();
+    showToast(`CREATED "${newName.toUpperCase()}"`);
+}
+
+function handlePresetDelete(e, key) {
+    e.stopPropagation();
+    delete state.presets[key];
+    delete state.presetNames[key];
+
+    if (currentPresetName === key) {
+        currentPresetName = DEFAULT_ACTIVE_PRESET;
+    }
+
+    browser.storage.local.set({ presetNames: state.presetNames }).catch(console.error);
+    saveState();
+    updateAllUI();
+    broadcastChanges();
+    showToast('PRESET DELETED');
+}
+
+function handleResetActivePreset() {
+    const factory = PRESET_DEFAULTS[currentPresetName] || PRESET_DEFAULTS.balanced;
+    const defaultName = DEFAULT_PRESET_NAMES[currentPresetName] || currentPresetName;
+
+    state.presets[currentPresetName] = deepClone(factory);
+    if (DEFAULT_PRESET_NAMES[currentPresetName]) {
+        state.presetNames[currentPresetName] = defaultName;
+        browser.storage.local.set({ presetNames: state.presetNames }).catch(console.error);
+    }
+
+    updatePresetButtonsUI();
+    updateSlidersUI();
+    updateSelectsUI();
+    broadcastChanges();
+    saveState();
+
+    const displayName = (state.presetNames[currentPresetName] || defaultName).toUpperCase();
+    showToast(`RESET ${displayName} TO DEFAULT`);
 }
 
 function updateSlidersUI() {
@@ -194,7 +396,8 @@ function updateSlidersUI() {
     SLIDER_KEYS.forEach(key => {
         const slider = document.getElementById(key);
         if (slider) {
-            const value = vals[key] !== undefined ? vals[key] : (PRESET_DEFAULTS[currentPresetName]?.[key] ?? 100);
+            const fallbackDef = SLIDER_RANGES[key]?.def ?? 0;
+            const value = vals[key] !== undefined ? vals[key] : (PRESET_DEFAULTS[currentPresetName]?.[key] ?? fallbackDef);
             slider.value = value;
             updateValueDisplay(key, value, document.getElementById(`${key}-value`));
             updateSliderFill(slider);
@@ -217,27 +420,25 @@ function updateWarmthModeState() {
     const vals = state.presets[currentPresetName];
     const select = document.getElementById('warmthMode');
     const container = document.getElementById('warmth-mode-container');
-    const badge = document.getElementById('warmth-mode-badge');
 
     if (!select || !vals) return;
 
     const isActive = Math.abs(vals.warmth || 0) > 0;
-
-    if (container) container.classList.toggle('disabled', !isActive);
-    select.disabled = !isActive;
-
-    if (badge) {
-        badge.textContent = isActive
-            ? (vals.warmthMode === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple')
-            : 'Inactive';
+    if (container) {
+        container.style.display = isActive ? 'block' : 'none';
     }
+    select.disabled = !isActive;
 }
 
 function updateValueDisplay(key, value, el) {
     if (!el) return;
     if (key === 'warmth') el.textContent = `${value > 0 ? '+' : ''}${value}°`;
-    else if (key === 'sharpness' || key === 'shadowBoost') el.textContent = value === 0 ? 'Off' : `${value}%`;
-    else el.textContent = `${value}%`;
+    else if (key === 'tint') el.textContent = `${value > 0 ? '+' : ''}${value}`;
+    else if (key === 'sharpness' || key === 'shadowBoost' || key === 'highlights' || key === 'vibrance') {
+        el.textContent = value === 0 ? 'OFF' : `${value}%`;
+    } else {
+        el.textContent = `${value}%`;
+    }
 }
 
 function updateSliderFill(slider) {
@@ -246,27 +447,29 @@ function updateSliderFill(slider) {
     const val = parseFloat(slider.value);
     const pct = ((val - min) / (max - min)) * 100;
 
-    if (slider.id === 'warmth') {
-        const midPct = ((-min) / (max - min)) * 100; // where 0 sits
-        slider.style.background = `linear-gradient(to right,
-            #5b9bd5 0%,
-            #8eb8e0 ${midPct * 0.5}%,
-            var(--surface-color) ${midPct}%,
-            #e8a84c ${midPct + (100 - midPct) * 0.5}%,
-            #d4782f 100%)`;
-        slider.style.setProperty('--fill-pct', `${pct}%`);
-    } else {
-        slider.style.background = `linear-gradient(to right,
-            var(--accent-color) 0%,
-            var(--accent-color) ${pct}%,
-            var(--surface-color) ${pct}%,
-            var(--surface-color) 100%)`;
-    }
+    // Solid flat split color fill, zero gradients!
+    slider.style.background = `linear-gradient(to right,
+        var(--accent-color) 0%,
+        var(--accent-color) ${pct}%,
+        #1c1c24 ${pct}%,
+        #1c1c24 100%)`;
 }
 
 function updateTabsUI() {
     document.getElementById('tab-global')?.classList.toggle('active', currentScope === 'global');
     document.getElementById('tab-site')?.classList.toggle('active', currentScope === 'site');
+
+    const resetSiteBtn = document.getElementById('btn-reset-site');
+    const siteTab = document.getElementById('tab-site');
+    const hasSiteOverride = Boolean(state.hostname && state.siteSettings && state.siteSettings[state.hostname]);
+
+    if (siteTab) {
+        siteTab.classList.toggle('has-override', hasSiteOverride && currentScope !== 'site');
+    }
+
+    if (resetSiteBtn) {
+        resetSiteBtn.classList.toggle('visible', hasSiteOverride && currentScope === 'site');
+    }
 }
 
 function updateAllUI() {
@@ -284,9 +487,70 @@ function toggleEnabled(e) {
 }
 
 function toggleImagesEnabled(e) {
-    state.enableImages = e.target.checked;
+    const isChecked = e.target.checked;
+    state.enableImages = isChecked;
+    if (state.globalSettings) {
+        state.globalSettings.enableImages = isChecked;
+    }
+    browser.storage.local.set({ enableImages: isChecked }).catch(console.error);
+
+    if (currentScope === 'site' && state.hostname) {
+        if (!state.siteSettings) state.siteSettings = {};
+        if (!state.siteSettings[state.hostname]) {
+            state.siteSettings[state.hostname] = {};
+        }
+        state.siteSettings[state.hostname].enableImages = isChecked;
+        browser.storage.local.set({ siteSettings: state.siteSettings }).catch(console.error);
+    }
     saveState();
     broadcastChanges();
+    showToast(isChecked ? 'IMAGE ENHANCE ON' : 'IMAGE ENHANCE OFF');
+}
+
+function togglePerformanceMode(e) {
+    state.performanceMode = e.target.checked;
+    saveState();
+    broadcastChanges();
+    showToast(state.performanceMode ? 'PERFORMANCE MODE ON' : 'QUALITY MODE ON');
+}
+
+function toggleCompressor(e) {
+    state.audioCompressor = e.target.checked;
+    saveState();
+    broadcastChanges();
+}
+
+function toggleHud(e) {
+    const isChecked = e.target.checked;
+    state.enableHud = isChecked;
+    saveState();
+    broadcastChanges();
+
+    const hudMsg = { type: 'SET_HUD_ENABLED', enabled: isChecked };
+    if (activeTabId) {
+        browser.tabs.sendMessage(activeTabId, hudMsg).catch(() => {});
+    } else {
+        browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+            if (tabs[0]?.id) browser.tabs.sendMessage(tabs[0].id, hudMsg).catch(() => {});
+        });
+    }
+
+    showToast(isChecked ? 'VIDEO HUD ENABLED' : 'VIDEO HUD DISABLED');
+}
+
+function handleAspectChange(e) {
+    state.aspectRatio = e.target.value;
+    saveState();
+    broadcastChanges();
+}
+
+function handleAudioBoostInput(e) {
+    state.audioBoost = parseInt(e.target.value, 10);
+    const label = document.getElementById('audioBoost-value');
+    if (label) label.textContent = `${state.audioBoost}%`;
+    updateSliderFill(e.target);
+    broadcastChanges();
+    debouncedSave();
 }
 
 function handlePresetClick(e) {
@@ -297,41 +561,11 @@ function handlePresetClick(e) {
     if (!name || name === currentPresetName) return;
 
     currentPresetName = name;
-
     updatePresetButtonsUI();
     updateSlidersUI();
     updateSelectsUI();
     broadcastChanges();
     saveState();
-}
-
-function handlePresetReset(e) {
-    e.stopPropagation();
-    const item = e.target.closest('.preset-item');
-    if (!item) return;
-
-    const key = item.dataset.preset;
-    if (PRESET_DEFAULTS[key]) {
-        state.presetNames[key] = DEFAULT_PRESET_NAMES[key];
-        browser.storage.local.set({ presetNames: state.presetNames }).catch(console.error);
-
-        state.presets[key] = deepClone(PRESET_DEFAULTS[key]);
-
-        const btn = item.querySelector('.preset-btn');
-        if (btn) {
-            btn.classList.add('reset-flash');
-            setTimeout(() => btn.classList.remove('reset-flash'), 600);
-        }
-
-        updatePresetButtonsUI();
-
-        if (key === currentPresetName) {
-            updateSlidersUI();
-            updateSelectsUI();
-        }
-        broadcastChanges();
-        saveState();
-    }
 }
 
 function handlePresetRightClick(e) {
@@ -342,7 +576,7 @@ function handlePresetRightClick(e) {
     const item = btn.closest('.preset-item');
     const key = item.dataset.preset;
 
-    const originalName = state.presetNames[key] || DEFAULT_PRESET_NAMES[key];
+    const originalName = state.presetNames[key] || DEFAULT_PRESET_NAMES[key] || key;
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'preset-rename-input';
@@ -355,8 +589,7 @@ function handlePresetRightClick(e) {
 
     const commit = () => {
         let newName = input.value.trim();
-        const factoryDefault = DEFAULT_PRESET_NAMES[key];
-
+        const factoryDefault = DEFAULT_PRESET_NAMES[key] || key;
         if (!newName) newName = factoryDefault;
 
         state.presetNames[key] = newName;
@@ -382,10 +615,6 @@ function handlePresetRightClick(e) {
 
 const debouncedSave = debounce(saveState, 300);
 
-function handleSliderChange(e) {
-    saveState();
-}
-
 function handleSliderInput(e) {
     const key = e.target.id;
     const val = parseInt(e.target.value, 10);
@@ -394,9 +623,26 @@ function handleSliderInput(e) {
         state.presets[currentPresetName][key] = val;
     }
 
+    if (currentScope === 'site' && state.hostname) {
+        if (!state.siteSettings) state.siteSettings = {};
+        if (!state.siteSettings[state.hostname]) {
+            state.siteSettings[state.hostname] = {
+                enabled: state.enabled,
+                enableImages: state.enableImages,
+                activePreset: currentPresetName,
+                presets: state.presets,
+                performanceMode: state.performanceMode,
+                aspectRatio: state.aspectRatio,
+                audioBoost: state.audioBoost,
+                audioCompressor: state.audioCompressor,
+                presetNames: state.presetNames
+            };
+        }
+        updateTabsUI();
+    }
+
     updateValueDisplay(key, val, document.getElementById(`${key}-value`));
     updateSliderFill(e.target);
-    updatePresetButtonsUI();
 
     if (key === 'warmth') updateWarmthModeState();
 
@@ -406,18 +652,17 @@ function handleSliderInput(e) {
 
 function handleSliderDblClick(e) {
     const key = e.target.id;
-    const factory = PRESET_DEFAULTS[currentPresetName];
-    if (!factory || factory[key] === undefined) return;
+    const factory = PRESET_DEFAULTS[currentPresetName] || PRESET_DEFAULTS.balanced;
+    const defVal = factory[key] !== undefined ? factory[key] : (SLIDER_RANGES[key]?.def ?? 0);
 
-    e.target.value = factory[key];
+    e.target.value = defVal;
 
     if (state.presets[currentPresetName]) {
-        state.presets[currentPresetName][key] = factory[key];
+        state.presets[currentPresetName][key] = defVal;
     }
 
-    updateValueDisplay(key, factory[key], document.getElementById(`${key}-value`));
+    updateValueDisplay(key, defVal, document.getElementById(`${key}-value`));
     updateSliderFill(e.target);
-    updatePresetButtonsUI();
 
     if (key === 'warmth') updateWarmthModeState();
 
@@ -425,21 +670,84 @@ function handleSliderDblClick(e) {
     saveState();
 }
 
-function broadcastChanges() {
-    browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
-        if (tabs[0]?.id) {
-            browser.tabs.sendMessage(tabs[0].id, {
-                type: 'UPDATE_SETTINGS',
-                settings: {
-                    enabled: state.enabled,
-                    enableImages: state.enableImages,
-                    activePreset: currentPresetName,
-                    presets: state.presets
-                },
-                ignoreStorage: true
-            }).catch(() => { });
-        }
+function makeValueDisplayEditable(labelEl, sliderId) {
+    labelEl.addEventListener('click', () => {
+        const slider = document.getElementById(sliderId);
+        if (!slider) return;
+
+        const currentVal = parseInt(slider.value, 10);
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'control-val-input';
+        input.value = currentVal;
+        input.min = slider.min;
+        input.max = slider.max;
+
+        labelEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        const commitValue = () => {
+            let newVal = parseInt(input.value, 10);
+            if (isNaN(newVal)) newVal = currentVal;
+            newVal = clamp(newVal, parseInt(slider.min, 10), parseInt(slider.max, 10));
+
+            slider.value = newVal;
+            if (state.presets[currentPresetName]) {
+                state.presets[currentPresetName][sliderId] = newVal;
+            }
+
+            labelEl.textContent = '';
+            input.replaceWith(labelEl);
+            updateValueDisplay(sliderId, newVal, labelEl);
+            updateSliderFill(slider);
+
+            if (sliderId === 'warmth') updateWarmthModeState();
+
+            broadcastChanges();
+            saveState();
+        };
+
+        input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') input.blur();
+            if (ev.key === 'Escape') {
+                input.value = currentVal;
+                input.blur();
+            }
+        });
+
+        input.addEventListener('blur', commitValue, { once: true });
     });
+}
+
+function broadcastChanges() {
+    const payload = {
+        type: 'UPDATE_SETTINGS',
+        settings: {
+            enabled: state.enabled,
+            enableImages: state.enableImages,
+            activePreset: currentPresetName,
+            presets: state.presets,
+            performanceMode: state.performanceMode,
+            aspectRatio: state.aspectRatio,
+            audioBoost: state.audioBoost,
+            audioCompressor: state.audioCompressor,
+            enableHud: state.enableHud ?? true,
+            hudFullscreenOnly: state.hudFullscreenOnly ?? false
+        },
+        ignoreStorage: true
+    };
+
+    if (activeTabId) {
+        browser.tabs.sendMessage(activeTabId, payload).catch(() => {});
+    } else {
+        getActiveTab().then(tab => {
+            if (tab?.id) {
+                activeTabId = tab.id;
+                browser.tabs.sendMessage(activeTabId, payload).catch(() => {});
+            }
+        }).catch(() => {});
+    }
 }
 
 function handleSelectChange(e) {
@@ -448,15 +756,28 @@ function handleSelectChange(e) {
         state.presets[currentPresetName][key] = e.target.value;
     }
 
-    if (key === 'warmthMode') {
-        const badge = document.getElementById('warmth-mode-badge');
-        if (badge) badge.textContent = e.target.value === WARMTH_MODE.CINEMATIC ? 'Cinematic' : 'Simple';
-    }
-
     updatePresetButtonsUI();
     saveState();
+    broadcastChanges();
 }
 
+function switchCategory(targetViewId) {
+    document.querySelectorAll('.category-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.target === targetViewId);
+    });
+    document.querySelectorAll('.category-view').forEach(view => {
+        view.classList.toggle('hidden', view.id !== targetViewId);
+    });
+}
+
+function switchSubTab(subTarget) {
+    document.querySelectorAll('.subtab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.sub === subTarget);
+    });
+    document.querySelectorAll('.adjust-subview').forEach(view => {
+        view.classList.toggle('hidden', view.id !== subTarget);
+    });
+}
 
 function exportSettings() {
     browser.storage.local.get(STORAGE_KEYS).then(data => {
@@ -468,10 +789,10 @@ function exportSettings() {
         a.click();
         URL.revokeObjectURL(url);
 
-        showToast('Settings exported!');
+        showToast('SETTINGS EXPORTED');
     }).catch(err => {
         console.error('Export error:', err);
-        showToast('Export failed');
+        showToast('EXPORT FAILED');
     });
 }
 
@@ -493,14 +814,14 @@ function importSettings() {
             }
             if (data.presetNames) {
                 const cleaned = {};
-                for (const key of Object.keys(PRESET_DEFAULTS)) {
-                    if (typeof data.presetNames[key] === 'string') {
-                        cleaned[key] = data.presetNames[key].slice(0, 20); // cap length
+                for (const [k, v] of Object.entries(data.presetNames)) {
+                    if (typeof v === 'string') {
+                        cleaned[k] = v.slice(0, 30);
                     }
                 }
                 data.presetNames = cleaned;
             }
-            if (data.activePreset && !PRESET_DEFAULTS[data.activePreset]) {
+            if (data.activePreset && !data.presets?.[data.activePreset] && !PRESET_DEFAULTS[data.activePreset]) {
                 data.activePreset = DEFAULT_ACTIVE_PRESET;
             }
 
@@ -509,10 +830,10 @@ function importSettings() {
             updateAllUI();
             broadcastChanges();
 
-            showToast('Settings imported!');
+            showToast('SETTINGS IMPORTED');
         } catch (err) {
             console.error('Import error:', err);
-            showToast('Invalid file');
+            showToast('INVALID SETTINGS');
         }
     });
 
@@ -523,47 +844,172 @@ function showToast(message) {
     let toast = document.getElementById('toast');
     if (!toast) return;
 
-    toast.textContent = message;
+    toast.textContent = '';
+    const span = document.createElement('span');
+    span.textContent = message;
+    toast.appendChild(span);
     toast.classList.add('visible');
     setTimeout(() => toast.classList.remove('visible'), 2000);
+}
+
+function getContrastColor(hexColor) {
+    if (!hexColor) return '#000000';
+    let hex = hexColor.replace('#', '');
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(hex.substring(0, 2), 16) || 0;
+    const g = parseInt(hex.substring(2, 4), 16) || 0;
+    const b = parseInt(hex.substring(4, 6), 16) || 0;
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 140 ? '#000000' : '#ffffff';
+}
+
+function applyThemeColor(color, shouldSave = false) {
+    if (!color) return;
+    state.themeColor = color;
+    const textColor = getContrastColor(color);
+    document.documentElement.style.setProperty('--accent-color', color);
+    document.documentElement.style.setProperty('--accent-text', textColor);
+
+    const norm = color.toLowerCase();
+    document.querySelectorAll('.theme-swatch').forEach(sw => {
+        sw.classList.toggle('active', (sw.dataset.color || '').toLowerCase() === norm);
+    });
+
+    const picker = document.getElementById('theme-color-picker');
+    if (picker && picker.value.toLowerCase() !== norm) {
+        picker.value = norm;
+    }
+
+    const dot = document.getElementById('theme-custom-dot');
+    if (dot) {
+        dot.style.background = color;
+    }
+
+    document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
+
+    if (shouldSave) {
+        browser.storage.local.set({ themeColor: color }).catch(console.error);
+        showToast('THEME UPDATED');
+    }
 }
 
 async function checkRestrictedPage() {
     const restricted = await isRestrictedPage();
     const banner = document.getElementById('restricted-banner');
-    const mainContent = document.getElementById('main-content');
-
-    if (restricted && banner && mainContent) {
-        banner.classList.add('visible');
-        mainContent.classList.add('restricted');
+    if (banner) {
+        banner.classList.toggle('visible', Boolean(restricted));
     }
 }
 
 function attachEventListeners() {
     document.getElementById('enabled-toggle')?.addEventListener('change', toggleEnabled);
     document.getElementById('images-toggle')?.addEventListener('change', toggleImagesEnabled);
-
-    document.querySelectorAll('.preset-btn').forEach(b => {
-        b.addEventListener('click', handlePresetClick);
-        b.addEventListener('contextmenu', handlePresetRightClick);
-    });
-    document.querySelectorAll('.preset-reset').forEach(b => b.addEventListener('click', handlePresetReset));
+    document.getElementById('performance-toggle')?.addEventListener('change', togglePerformanceMode);
+    document.getElementById('compressor-toggle')?.addEventListener('change', toggleCompressor);
+    document.getElementById('hud-toggle')?.addEventListener('change', toggleHud);
+    document.getElementById('aspectRatio')?.addEventListener('change', handleAspectChange);
+    document.getElementById('audioBoost')?.addEventListener('input', handleAudioBoostInput);
 
     SLIDER_KEYS.forEach(k => {
         const slider = document.getElementById(k);
+        const label = document.getElementById(`${k}-value`);
         if (slider) {
             slider.addEventListener('input', handleSliderInput);
-            slider.addEventListener('change', handleSliderChange);
+            slider.addEventListener('change', () => saveState());
             slider.addEventListener('dblclick', handleSliderDblClick);
         }
+        if (label && slider) {
+            makeValueDisplayEditable(label, k);
+        }
     });
+
+    document.querySelectorAll('.btn-slider-reset').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.slider;
+            if (key === 'audioBoost') {
+                const slider = document.getElementById('audioBoost');
+                if (slider) {
+                    slider.value = 100;
+                    state.audioBoost = 100;
+                    const label = document.getElementById('audioBoost-value');
+                    if (label) label.textContent = '100%';
+                    updateSliderFill(slider);
+                    broadcastChanges();
+                    saveState();
+                }
+                return;
+            }
+
+            const slider = document.getElementById(key);
+            if (!slider) return;
+
+            const factory = PRESET_DEFAULTS[currentPresetName] || PRESET_DEFAULTS.balanced;
+            const defVal = factory[key] !== undefined ? factory[key] : (SLIDER_RANGES[key]?.def ?? 0);
+
+            slider.value = defVal;
+            if (state.presets[currentPresetName]) {
+                state.presets[currentPresetName][key] = defVal;
+            }
+
+            updateValueDisplay(key, defVal, document.getElementById(`${key}-value`));
+            updateSliderFill(slider);
+
+            if (key === 'warmth') updateWarmthModeState();
+
+            broadcastChanges();
+            saveState();
+        });
+    });
+
     SELECT_KEYS.forEach(k => document.getElementById(k)?.addEventListener('change', handleSelectChange));
 
     document.getElementById('tab-global')?.addEventListener('click', () => switchScope('global'));
     document.getElementById('tab-site')?.addEventListener('click', () => switchScope('site'));
+    document.getElementById('btn-reset-site')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetSiteOverride();
+    });
 
+    document.querySelectorAll('.category-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchCategory(btn.dataset.target));
+    });
+
+    document.querySelectorAll('.subtab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchSubTab(btn.dataset.sub));
+    });
+
+    document.querySelectorAll('.theme-swatch').forEach(sw => {
+        sw.addEventListener('click', () => {
+            applyThemeColor(sw.dataset.color, true);
+        });
+    });
+
+    const colorPicker = document.getElementById('theme-color-picker');
+    if (colorPicker) {
+        colorPicker.addEventListener('input', (e) => applyThemeColor(e.target.value, false));
+        colorPicker.addEventListener('change', (e) => applyThemeColor(e.target.value, true));
+    }
+
+    document.getElementById('btn-reset-preset')?.addEventListener('click', handleResetActivePreset);
+    document.getElementById('preset-add-btn')?.addEventListener('click', handleCreateCustomPreset);
     document.getElementById('btn-export')?.addEventListener('click', exportSettings);
     document.getElementById('btn-import')?.addEventListener('click', importSettings);
+
+    browser.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local') {
+            // Avoid interrupting an active slider or text input interaction in popup
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT')) {
+                return;
+            }
+            loadState().then(() => {
+                updateAllUI();
+            }).catch(console.error);
+        }
+    });
 }
 
 async function init() {
@@ -571,12 +1017,14 @@ async function init() {
     updateAllUI();
     attachEventListeners();
     checkRestrictedPage();
-    
-    // Remove preload class after a short delay to re-enable transitions
-    // This prevents "CSS transition flash" on load which causes window jitter on Linux Wayland.
+
     setTimeout(() => {
         document.body.classList.remove('preload');
-    }, 100);
+    }, 80);
 }
 
-init();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

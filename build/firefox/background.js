@@ -144,9 +144,34 @@ browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
     }
 });
 
-browser.runtime.onMessage.addListener((message, sender) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'GET_TAB_HOSTNAME') {
         const hostname = getHostname(sender.tab?.url);
-        return Promise.resolve({ hostname });
+        sendResponse({ hostname });
+        return false;
+    }
+    if (message.type === 'SYNC_TAB_SETTINGS' && message.settings) {
+        if (sender.tab?.id) {
+            browser.tabs.sendMessage(sender.tab.id, {
+                type: 'UPDATE_SETTINGS',
+                settings: message.settings,
+                ignoreStorage: true
+            }).catch(() => {});
+        }
+        return false;
+    }
+    if (message.type === 'BROADCAST_SETTINGS' && message.settings) {
+        browser.tabs.query({}).then(tabs => {
+            for (const tab of tabs) {
+                if (tab.id && tab.id !== sender.tab?.id) {
+                    browser.tabs.sendMessage(tab.id, {
+                        type: 'UPDATE_SETTINGS',
+                        settings: message.settings,
+                        ignoreStorage: true
+                    }).catch(() => {});
+                }
+            }
+        }).catch(() => {});
+        return false;
     }
 });

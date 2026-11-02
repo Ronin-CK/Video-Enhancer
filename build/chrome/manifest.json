@@ -1,11 +1,12 @@
 {
     "manifest_version": 3,
     "name": "Video Enhancer",
-    "version": "3.3.4",
+    "version": "3.4.0",
     "description": "Enhance video colors with fake HDR effects",
     "permissions": [
         "storage",
-        "activeTab"
+        "activeTab",
+        "tabs"
     ],
     "host_permissions": [
         "<all_urls>"
@@ -38,7 +39,9 @@
                 "content.js"
             ],
             "run_at": "document_start",
-            "all_frames": true
+            "all_frames": true,
+            "match_origin_as_fallback": true,
+            "match_about_blank": true
         }
     ],
     "icons": {

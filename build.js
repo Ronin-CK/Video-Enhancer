@@ -57,13 +57,13 @@ function build() {
         path.join(CHROME_DIR, 'manifest.json'), 
         JSON.stringify(chromeManifest, null, 4)
     );
-    console.log(`[${new Date().toLocaleTimeString()}] ✔ Chrome build updated at build/chrome`);
+    console.log(`[${new Date().toLocaleTimeString()}] [OK] Chrome build updated at build/chrome`);
 
     fs.writeFileSync(
         path.join(FIREFOX_DIR, 'manifest.json'), 
         JSON.stringify(firefoxManifest, null, 4)
     );
-    console.log(`[${new Date().toLocaleTimeString()}] ✔ Firefox build updated at build/firefox`);
+    console.log(`[${new Date().toLocaleTimeString()}] [OK] Firefox build updated at build/firefox`);
 }
 
 // Initial build
@@ -71,7 +71,7 @@ build();
 
 // Watch mode
 if (process.argv.includes('--watch')) {
-    console.log('\n👀 Watching src/ for changes...');
+    console.log('\nWatching src/ for changes...');
     
     // Simple debounce to prevent double-builds on double-saves
     let timeoutId;

@@ -1,819 +1,382 @@
 <!--
  - Copyright (c) 2026 Chandra Kant (Ronin-CK)
  - All Rights Reserved.
- - This product and its source code are proprietary.
+ - Tactical Flat Neo-Anime UI
 -->
 
 <!DOCTYPE html>
-<html style="width: 330px; height: 580px; min-width: 330px; max-width: 330px; min-height: 580px; max-height: 580px; overflow: hidden; margin: 0; padding: 0;">
+<html>
 
 <head>
     <meta charset="UTF-8">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="dark">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        body.preload * {
-            transition: none !important;
-        }
-
-        /* mobile optimization: override inline fixed dimensions for phones */
-        @media (hover: none) {
-            html, body, #main-content {
-                width: 100% !important;
-                min-width: 100% !important;
-                max-width: 100% !important;
-                height: 100% !important;
-                min-height: 100% !important;
-                max-height: 100% !important;
-                border-radius: 0 !important;
-            }
-            body {
-                font-size: 15px !important;
-                padding: 20px !important;
-            }
-            .preset-btn {
-                padding: 10px 4px !important;
-            }
-            .control-header {
-                margin-bottom: 12px !important;
-            }
-            input[type="range"] {
-                height: 24px !important;
-            }
-        }
-/*
- * Copyright (c) 2026 Chandra Kant (Ronin-CK)
- * All Rights Reserved.
- * This product and its source code are proprietary.
- */
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html {
-    background-color: var(--bg-color);
-}
-
-:root {
-    color-scheme: light dark;
-    --bg-color: #ffffff;
-    --text-color: #333333;
-    --surface-color: #f0f0f4;
-    --surface-hover: #e0e0e4;
-    --accent-color: #4CAF50;
-    --border-color: #dcdce0;
-    --subtle-text: #666666;
-    --warning-color: #ff9800;
-    --warning-hover: #f57c00;
-    --overlay-hover: rgba(0, 0, 0, 0.05);
-    --overlay-active: rgba(0, 0, 0, 0.08);
-    --toggle-thumb-bg: #ffffff;
-    --slider-thumb-bg: #ffffff;
-    --toggle-thumb-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-color: #121212;
-        --text-color: #ffffff;
-        --surface-color: #2d2d2d;
-        --surface-hover: #3e3e3e;
-        --accent-color: #4CAF50;
-        --border-color: #404040;
-        --subtle-text: #bbbbbb;
-        --overlay-hover: rgba(255, 255, 255, 0.05);
-        --overlay-active: rgba(255, 255, 255, 0.08);
-        --toggle-thumb-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-        --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        --slider-thumb-bg: var(--surface-hover);
-    }
-}
-
-/* base styles */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 13px;
-    background: var(--bg-color);
-    color: var(--text-color);
-}
-
-/* header */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.title {
-    font-size: 16px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-
-
-/* Toggle */
-.toggle {
-    position: relative;
-    width: 48px;
-    height: 26px;
-    cursor: pointer;
-}
-
-.toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.toggle-track {
-    position: absolute;
-    inset: 0;
-    background: var(--surface-color);
-    border-radius: 26px;
-    transition: background 0.2s;
-    border: 1px solid var(--border-color);
-}
-
-.toggle input:checked+.toggle-track {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
-}
-
-.toggle-thumb {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    background: var(--toggle-thumb-bg);
-    border-radius: 50%;
-    transition: transform 0.25s;
-    box-shadow: var(--toggle-thumb-shadow);
-    border: 1px solid var(--border-color);
-}
-
-.toggle input:checked~.toggle-thumb {
-    transform: translateX(22px);
-    border-color: transparent;
-}
-
-.toggle input:focus-visible~.toggle-thumb {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-/* Tabs */
-.tabs {
-    display: flex;
-    background: var(--surface-color);
-    border-radius: 8px;
-    padding: 4px;
-    margin-bottom: 16px;
-    gap: 4px;
-}
-
-.tab-btn {
-    flex: 1;
-    padding: 8px;
-    border: none;
-    background: transparent;
-    color: var(--subtle-text);
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 7px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tab-btn:hover:not(:disabled) {
-    color: var(--text-color);
-    background: var(--overlay-hover);
-}
-
-.tab-btn.active {
-    background: var(--bg-color);
-    color: var(--text-color);
-    box-shadow: var(--card-shadow);
-}
-
-.tab-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.tab-btn:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-/* presets */
-.section {
-    margin-bottom: 16px;
-}
-
-.section-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--subtle-text);
-    margin-bottom: 8px;
-}
-
-.preset-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-
-
-.preset-reset {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 18px;
-    height: 18px;
-    border: none;
-    border-radius: 50%;
-    background: var(--warning-color);
-    color: #fff;
-    font-size: 12px;
-    cursor: pointer;
-    opacity: 0;
-    transform: scale(0.5);
-    transition: all 0.2s;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.preset-reset:hover {
-    background: var(--warning-hover);
-}
-
-.preset-item.modified .preset-reset {
-    opacity: 1;
-    transform: scale(1);
-}
-
-.preset-reset:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-.preset-item {
-    position: relative;
-}
-
-.preset-btn {
-    width: 100%;
-    padding: 10px 6px;
-    border: 2px solid var(--border-color);
-    background: var(--surface-color);
-    color: var(--text-color);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 500;
-    transition: all 0.2s;
-    text-align: center;
-}
-
-.preset-btn:hover {
-    border-color: var(--surface-hover);
-    background: var(--surface-hover);
-}
-
-.preset-btn.active {
-    border-color: var(--accent-color);
-    background: rgba(76, 175, 80, 0.15);
-    color: var(--accent-color);
-    box-shadow: 0 0 12px rgba(76, 175, 80, 0.3);
-}
-
-.preset-btn:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-/* preset reset flash animation */
-@keyframes resetFlash {
-    0% { background: rgba(76, 175, 80, 0.4); }
-    100% { background: var(--surface-color); }
-}
-
-.preset-btn.reset-flash {
-    animation: resetFlash 0.6s ease-out;
-}
-
-.preset-rename-input {
-    width: 100%;
-    padding: 0;
-    margin: 0;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    text-align: center;
-    outline: none;
-    font-family: inherit;
-}
-
-
-
-.divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border-color), transparent);
-    margin: 16px 0;
-}
-
-/* manual adjustments */
-.control {
-    margin-bottom: 14px;
-}
-
-.control-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-}
-
-.control-label {
-    font-size: 12px;
-    color: var(--subtle-text);
-}
-
-.hint-text {
-    display: block;
-    font-size: 9px;
-    opacity: 0.6;
-    margin-top: 1px;
-    letter-spacing: 0.3px;
-}
-
-.control-value {
-    font-size: 12px;
-    font-family: 'SF Mono', Monaco, monospace;
-    color: var(--accent-color);
-    min-width: 45px;
-    text-align: right;
-}
-
-input[type="range"] {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--surface-color);
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-    cursor: pointer;
-    transition: background 0.1s;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--slider-thumb-bg);
-    border: 2px solid var(--accent-color);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: var(--card-shadow);
-    transition: transform 0.15s;
-}
-
-input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-}
-
-input[type="range"]::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--slider-thumb-bg);
-    border: 2px solid var(--accent-color);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: var(--card-shadow);
-}
-
-input[type="range"]::-moz-range-track {
-    background: transparent;
-    height: 6px;
-    border-radius: 3px;
-}
-
-/* firefox slider fill (left side of thumb) */
-input[type="range"]::-moz-range-progress {
-    background: var(--accent-color);
-    height: 6px;
-    border-radius: 3px 0 0 3px;
-}
-
-/* warmth slider special — disable the progress bar since we use full gradient */
-input[type="range"]#warmth::-moz-range-progress {
-    background: transparent;
-}
-
-.control-select {
-    width: 100%;
-    padding: 8px 12px;
-    background: var(--surface-color);
-    border: 2px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-color);
-    font-size: 12px;
-    cursor: pointer;
-    outline: none;
-    transition: all 0.2s;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 30px;
-}
-
-@media (prefers-color-scheme: dark) {
-    .control-select {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23bbbbbb' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
-    }
-}
-
-.control-select:hover {
-    border-color: var(--surface-hover);
-}
-
-.control-select:focus {
-    border-color: var(--accent-color);
-}
-
-.control-select:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.control-select:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-.control-select option {
-    background: var(--bg-color);
-    color: var(--text-color);
-    padding: 8px;
-}
-
-.control.sub-control {
-    margin-left: 12px;
-    padding-left: 12px;
-    border-left: 2px solid var(--border-color);
-    margin-bottom: 14px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    max-height: 100px;
-    opacity: 1;
-    overflow: hidden;
-}
-
-.control.sub-control.disabled {
-    max-height: 0;
-    opacity: 0;
-    margin-bottom: 0;
-    pointer-events: none;
-    border-left-color: transparent;
-}
-
-.control.sub-control .control-label {
-    font-size: 11px;
-}
-
-.mode-badge {
-    display: inline-block;
-    padding: 2px 6px;
-    background: rgba(76, 175, 80, 0.2);
-    border-radius: 4px;
-    font-size: 9px;
-    color: var(--accent-color);
-    margin-left: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* import / export buttons */
-.io-section {
-    margin-bottom: 8px;
-}
-
-.io-buttons {
-    display: flex;
-    gap: 8px;
-}
-
-.io-btn {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    background: var(--surface-color);
-    color: var(--subtle-text);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 500;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-
-.io-btn:hover {
-    background: var(--surface-hover);
-    color: var(--text-color);
-    border-color: var(--surface-hover);
-}
-
-.io-btn:active {
-    transform: scale(0.97);
-}
-
-.io-btn:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-.io-icon {
-    font-size: 13px;
-    font-weight: 700;
-}
-
-/* toast notification */
-.toast {
-    position: fixed;
-    bottom: -40px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--accent-color);
-    color: #fff;
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
-    pointer-events: none;
-    white-space: nowrap;
-}
-
-.toast.visible {
-    bottom: 12px;
-    opacity: 1;
-}
-
-/* restricted page banner */
-.restricted-banner {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: rgba(244, 67, 54, 0.1);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    border-radius: 8px;
-    color: #f44336;
-    font-size: 12px;
-    font-weight: 500;
-    margin-bottom: 12px;
-}
-
-.restricted-banner.visible {
-    display: flex;
-}
-
-.restricted-icon {
-    font-size: 16px;
-}
-
-/* dim main content when restricted */
-#main-content.restricted {
-    opacity: 0.4;
-    pointer-events: none;
-    filter: grayscale(0.5);
-}
-
-/* footer */
-.footer {
-    margin-top: 16px;
-    text-align: center;
-    font-size: 10px;
-    color: var(--subtle-text);
-}
-
-.footer kbd {
-    display: inline-block;
-    padding: 1px 5px;
-    border: 1px solid var(--border-color);
-    border-radius: 3px;
-    background: var(--surface-color);
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 9px;
-    color: var(--subtle-text);
-}
-</style>
+    <title>Video Enhancer</title>
+    <link rel="stylesheet" href="popup.css">
 </head>
 
-<body class="preload" style="width: 330px; height: 580px; min-width: 330px; max-width: 330px; min-height: 580px; max-height: 580px; margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-color);">
-    <!-- main scrollable wrapper to prevent body resizing -->
-    <div id="main-content" style="width: 330px; height: 580px; overflow-y: auto; overflow-x: hidden; padding: 16px; box-sizing: border-box;">
+<body class="preload">
+    <div id="popup-container">
 
-    <!-- restricted page banner -->
-    <div class="restricted-banner" id="restricted-banner">
-        <span class="restricted-icon">🚫</span>
-        <span>Not available on this page</span>
-    </div>
+        <!-- restricted banner -->
+        <div class="restricted-banner" id="restricted-banner">
+            <span><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>RESTRICTED BROWSER PAGE</span>
+        </div>
 
-    <!-- toast notification -->
-    <div class="toast" id="toast"></div>
-
-    <!-- main content wrapper -->
-    <div id="main-content">
+        <!-- toast notification -->
+        <div class="toast" id="toast"><span>SETTINGS SAVED</span></div>
 
         <!-- header -->
         <div class="header">
-            <div class="title">
-                <img src="icon.svg" width="20" height="20" alt="logo" style="vertical-align: middle; margin-right: 6px; transform: translateY(-1px);">
-                Video Enhancer
+            <div class="brand">
+                <span class="brand-tag"><span>HDR</span></span>
+                <span>VIDEO ENHANCER</span>
             </div>
-            <label class="toggle">
+            <label class="toggle" title="Toggle Enhancer Engine">
                 <input type="checkbox" id="enabled-toggle">
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
             </label>
         </div>
 
-        <!-- settings scope -->
-        <div class="tabs">
-            <button class="tab-btn active" id="tab-global">Global Defaults</button>
-            <button class="tab-btn" id="tab-site">Current Site</button>
+        <!-- scope navigation -->
+        <div class="scope-bar">
+            <button class="skew-btn scope-btn active" id="tab-global">
+                <span class="unskew">GLOBAL</span>
+            </button>
+            <button class="skew-btn scope-btn" id="tab-site">
+                <span class="unskew" id="tab-site-label">CURRENT SITE</span>
+            </button>
+            <button class="skew-btn btn-reset-scope" id="btn-reset-site" title="Reset site to global defaults">
+                <span class="unskew">RESET</span>
+            </button>
         </div>
 
-        <!-- image enhancement -->
-        <div class="section" style="margin-bottom: 12px;">
-            <div class="control-header">
-                <span class="control-label"
-                    style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Enhance Images</span>
-                <label class="toggle" style="transform: scale(0.8); margin-right: -4px;">
-                    <input type="checkbox" id="images-toggle">
+        <!-- category navigation -->
+        <div class="category-nav">
+            <button class="skew-btn category-tab active" id="cat-color" data-target="view-color">
+                <span class="unskew">COLOR & HDR</span>
+            </button>
+            <button class="skew-btn category-tab" id="cat-playback" data-target="view-playback">
+                <span class="unskew">PLAYBACK</span>
+            </button>
+            <button class="skew-btn category-tab" id="cat-settings" data-target="view-settings">
+                <span class="unskew">CONFIG</span>
+            </button>
+        </div>
+
+        <!-- 1. COLOR & HDR VIEW -->
+        <div class="category-view" id="view-color">
+            <!-- presets header & grid -->
+            <div class="section-header">
+                <div class="section-title">PRESETS</div>
+                <div style="display: flex; gap: 4px;">
+                    <button class="skew-btn btn-reset-preset" id="btn-reset-preset" title="Reset active preset to factory defaults">
+                        <span class="unskew">RESET</span>
+                    </button>
+                    <button class="skew-btn btn-add-preset" id="preset-add-btn">
+                        <span class="unskew">+ NEW PRESET</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="preset-grid" id="preset-grid">
+                <!-- Populated dynamically via popup.js -->
+            </div>
+
+            <!-- adjustments header with sub-tabs -->
+            <div class="section-header" style="margin-top: 6px;">
+                <div class="section-title">ADJUSTMENTS</div>
+                <div class="adjust-subnav">
+                    <button class="skew-btn subtab-btn active" data-sub="sub-basic">
+                        <span class="unskew">BASIC TONE</span>
+                    </button>
+                    <button class="skew-btn subtab-btn" data-sub="sub-hdr">
+                        <span class="unskew">HDR & DETAIL</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Subview 1: Basic Tone (5 sliders) -->
+            <div class="adjust-subview" id="sub-basic">
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>BRIGHTNESS</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="brightness" title="Reset Brightness to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="brightness-value" title="Click to type value">105%</span>
+                        </div>
+                    </div>
+                    <input type="range" id="brightness" min="50" max="150" value="105">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>CONTRAST</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="contrast" title="Reset Contrast to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="contrast-value" title="Click to type value">115%</span>
+                        </div>
+                    </div>
+                    <input type="range" id="contrast" min="50" max="200" value="115">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>SATURATION</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="saturate" title="Reset Saturation to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="saturate-value" title="Click to type value">120%</span>
+                        </div>
+                    </div>
+                    <input type="range" id="saturate" min="50" max="200" value="120">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/></svg>VIBRANCE</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="vibrance" title="Reset Vibrance to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="vibrance-value" title="Click to type value">Off</span>
+                        </div>
+                    </div>
+                    <input type="range" id="vibrance" min="0" max="100" value="0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>INTENSITY</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="intensity" title="Reset Intensity to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="intensity-value" title="Click to type value">50%</span>
+                        </div>
+                    </div>
+                    <input type="range" id="intensity" min="0" max="100" value="50">
+                </div>
+            </div>
+
+            <!-- Subview 2: HDR & Detail (5 sliders + mode select) -->
+            <div class="adjust-subview hidden" id="sub-hdr">
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>SHADOW BOOST</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="shadowBoost" title="Reset Shadow Boost to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="shadowBoost-value" title="Click to type value">Off</span>
+                        </div>
+                    </div>
+                    <input type="range" id="shadowBoost" min="0" max="100" value="0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>HIGHLIGHT ROLLOFF</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="highlights" title="Reset Highlight Rolloff to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="highlights-value" title="Click to type value">Off</span>
+                        </div>
+                    </div>
+                    <input type="range" id="highlights" min="0" max="100" value="0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><polygon points="12 2 2 22 22 22"/></svg>SHARPNESS</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="sharpness" title="Reset Sharpness to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="sharpness-value" title="Click to type value">Off</span>
+                        </div>
+                    </div>
+                    <input type="range" id="sharpness" min="0" max="100" value="0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>WARMTH</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="warmth" title="Reset Warmth to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="warmth-value" title="Click to type value">0°</span>
+                        </div>
+                    </div>
+                    <input type="range" id="warmth" min="-30" max="30" value="0">
+                </div>
+
+                <div class="control-row">
+                    <div class="control-top">
+                        <span class="control-name"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="21"/></svg>TINT</span>
+                        <div class="control-val-wrap">
+                            <button type="button" class="btn-slider-reset" data-slider="tint" title="Reset Tint to default">
+                                <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                            <span class="control-val" id="tint-value" title="Click to type value">0</span>
+                        </div>
+                    </div>
+                    <input type="range" id="tint" min="-30" max="30" value="0">
+                </div>
+
+                <div class="control-row" id="warmth-mode-container" style="display: none; margin-top: 4px;">
+                    <div class="control-top">
+                        <span class="control-name">WARMTH STYLE</span>
+                    </div>
+                    <select class="control-select" id="warmthMode">
+                        <option value="simple">SIMPLE — UNIFORM SHIFT</option>
+                        <option value="cinematic">CINEMATIC — SPLIT TONE</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. PLAYBACK VIEW -->
+        <div class="category-view hidden" id="view-playback">
+            <div class="section-header">
+                <div class="section-title">VIDEO GEOMETRY</div>
+            </div>
+            <select class="control-select" id="aspectRatio" style="margin-bottom: 14px;">
+                <option value="default">DEFAULT — ORIGINAL ASPECT</option>
+                <option value="fill">FILL SCREEN (COVER)</option>
+                <option value="crop219">CROP TO 21:9 (ULTRAWIDE ZOOM)</option>
+                <option value="stretch">STRETCH TO FILL</option>
+                <option value="flip">FLIP HORIZONTAL (MIRROR)</option>
+            </select>
+
+            <div class="section-header">
+                <div class="section-title">AUDIO ENHANCER</div>
+            </div>
+
+            <div class="control-row" style="margin-bottom: 12px;">
+                <div class="control-top">
+                    <span class="control-name">VOLUME BOOST</span>
+                    <div class="control-val-wrap">
+                        <button type="button" class="btn-slider-reset" data-slider="audioBoost" title="Reset Volume Boost to default">
+                            <svg viewBox="0 0 24 24" class="ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        </button>
+                        <span class="control-val" id="audioBoost-value">100%</span>
+                    </div>
+                </div>
+                <input type="range" id="audioBoost" min="100" max="400" step="25" value="100">
+            </div>
+
+            <div class="tactical-card">
+                <div>
+                    <div class="card-title">DIALOGUE COMPRESSOR</div>
+                    <div class="card-desc">Night mode: boosts dialogue, limits peaks</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="compressor-toggle">
                     <div class="toggle-track"></div>
                     <div class="toggle-thumb"></div>
                 </label>
             </div>
         </div>
 
-        <!-- presets -->
-        <div class="section">
-            <div class="section-label">Presets</div>
-            <div class="preset-grid">
-                <div class="preset-item" data-preset="anime">
-                    <button class="preset-btn">Anime</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-                <div class="preset-item" data-preset="balanced">
-                    <button class="preset-btn active">Balanced</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-                <div class="preset-item" data-preset="vivid">
-                    <button class="preset-btn">Vivid</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-                <div class="preset-item" data-preset="cinema">
-                    <button class="preset-btn">Cinema</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-                <div class="preset-item" data-preset="gaming">
-                    <button class="preset-btn">Gaming</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-                <div class="preset-item" data-preset="warm">
-                    <button class="preset-btn">Warm</button>
-                    <button class="preset-reset" title="Reset to default">↺</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- adjustments -->
-        <div class="section">
-            <div class="section-label">Adjustments</div>
-
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Brightness</span>
-                    <span class="control-value" id="brightness-value">105%</span>
-                </div>
-                <input type="range" id="brightness" min="50" max="150" value="105">
+        <!-- 3. CONFIG VIEW -->
+        <div class="category-view hidden" id="view-settings">
+            <div class="section-header">
+                <div class="section-title">SYSTEM PREFERENCES</div>
             </div>
 
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Contrast</span>
-                    <span class="control-value" id="contrast-value">115%</span>
+            <div class="tactical-card">
+                <div>
+                    <div class="card-title">PERFORMANCE MODE</div>
+                    <div class="card-desc">Pure CSS GPU pipeline for 4K 60fps & battery saving</div>
                 </div>
-                <input type="range" id="contrast" min="50" max="200" value="115">
+                <label class="toggle">
+                    <input type="checkbox" id="performance-toggle">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
             </div>
 
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Saturation</span>
-                    <span class="control-value" id="saturate-value">120%</span>
+            <div class="tactical-card">
+                <div>
+                    <div class="card-title">ENHANCE WEB IMAGES</div>
+                    <div class="card-desc">Apply visual enhancements to thumbnails & pictures</div>
                 </div>
-                <input type="range" id="saturate" min="50" max="200" value="120">
+                <label class="toggle">
+                    <input type="checkbox" id="images-toggle">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
             </div>
 
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Warmth</span>
-                    <span class="control-value" id="warmth-value">0°</span>
-                </div>
-                <input type="range" id="warmth" min="-30" max="30" value="0">
+            <div class="section-header" style="margin-top: 14px;">
+                <div class="section-title">ON-SCREEN VIDEO HUD</div>
             </div>
 
-            <!-- warmth style -->
-            <div class="control sub-control disabled" id="warmth-mode-container">
-                <div class="control-header">
-                    <span class="control-label">
-                        Warmth Style
-                        <span class="mode-badge" id="warmth-mode-badge">Simple</span>
+            <div class="tactical-card">
+                <div>
+                    <div class="card-title">ENABLE VIDEO HUD & OSD</div>
+                    <div class="card-desc">Show floating badge, tweak panel & notifications on all videos</div>
+                </div>
+                <label class="toggle">
+                    <input type="checkbox" id="hud-toggle" checked>
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+
+            <div class="section-header" style="margin-top: 14px;">
+                <div class="section-title">INTERFACE ACCENT COLOR</div>
+            </div>
+
+            <div class="theme-section">
+                <div class="theme-palette" id="theme-palette">
+                    <button class="theme-swatch" data-color="#6ecc00" style="--swatch-color: #6ecc00;" title="Lime Neon"></button>
+                    <button class="theme-swatch" data-color="#00e5ff" style="--swatch-color: #00e5ff;" title="Cyber Cyan"></button>
+                    <button class="theme-swatch" data-color="#ffd600" style="--swatch-color: #ffd600;" title="Solar Gold"></button>
+                    <button class="theme-swatch active" data-color="#ff9800" style="--swatch-color: #ff9800;" title="Amber Flame (Default)"></button>
+                    <button class="theme-swatch" data-color="#ff3344" style="--swatch-color: #ff3344;" title="Crimson Blade"></button>
+                    <button class="theme-swatch" data-color="#ff2a85" style="--swatch-color: #ff2a85;" title="Hot Magenta"></button>
+                    <button class="theme-swatch" data-color="#b347ff" style="--swatch-color: #b347ff;" title="Neon Violet"></button>
+                    <button class="theme-swatch" data-color="#e0e0f0" style="--swatch-color: #e0e0f0;" title="Ghost Silver"></button>
+                </div>
+                <label class="skew-btn theme-custom-btn" title="Pick any custom color">
+                    <input type="color" id="theme-color-picker" value="#ff9800">
+                    <span class="unskew">
+                        <span class="theme-color-dot" id="theme-custom-dot"></span>
+                        CUSTOM COLOR
                     </span>
-                </div>
-                <select class="control-select" id="warmthMode">
-                    <option value="simple">Simple — Uniform color shift</option>
-                    <option value="cinematic">Cinematic — Warm highlights, cool shadows</option>
-                </select>
+                </label>
             </div>
 
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Intensity</span>
-                    <span class="control-value" id="intensity-value">50%</span>
-                </div>
-                <input type="range" id="intensity" min="0" max="100" value="50">
+            <div class="section-header" style="margin-top: 14px;">
+                <div class="section-title">DATA MANAGEMENT</div>
             </div>
 
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Sharpness</span>
-                    <span class="control-value" id="sharpness-value">Off</span>
-                </div>
-                <input type="range" id="sharpness" min="0" max="100" value="0">
-            </div>
-
-            <div class="control">
-                <div class="control-header">
-                    <span class="control-label">Shadow Boost
-                        <span class="hint-text">Dark detail recovery</span>
-                    </span>
-                    <span class="control-value" id="shadowBoost-value">Off</span>
-                </div>
-                <input type="range" id="shadowBoost" min="0" max="100" value="0">
-            </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- import / export -->
-        <div class="section io-section">
-            <div class="io-buttons">
-                <button class="io-btn" id="btn-export" title="Export settings to file">
-                    <span class="io-icon">↗</span> Export
+            <div class="io-row">
+                <button class="skew-btn io-btn" id="btn-export">
+                    <span class="unskew"><svg class="ic" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>EXPORT JSON</span>
                 </button>
-                <button class="io-btn" id="btn-import" title="Import settings from file">
-                    <span class="io-icon">↙</span> Import
+                <button class="skew-btn io-btn" id="btn-import">
+                    <span class="unskew"><svg class="ic" viewBox="0 0 24 24"><line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/></svg>IMPORT JSON</span>
                 </button>
             </div>
         </div>
 
+        <!-- footer -->
         <div class="footer">
-            Changes apply instantly · <kbd>Alt+Shift+V</kbd> to toggle
+            <span><span class="live-dot">●</span> REALTIME PIPELINE</span>
+            <span><kbd>ALT+SHIFT+V</kbd> TOGGLE</span>
         </div>
 
-    </div>
     </div>
 
     <script src="shared.js"></script>
