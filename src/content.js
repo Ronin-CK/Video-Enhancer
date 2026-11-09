@@ -9,10 +9,9 @@ const IMAGE_STYLE_ID = 'firefox-hdr-optimizer-image-style';
 const ASPECT_STYLE_ID = 'video-enhancer-aspect-style';
 const SVG_FILTER_ID = 'video-enhancer-filter';
 const SVG_CONTAINER_ID = 'video-enhancer-svg-container';
-const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const SHADOW_FILTER_ID = 'video-enhancer-shadow';
 const DEBOUNCE_DELAY = 100;
-const HUD_IDLE_TIMEOUT = 1300;
+const HUD_IDLE_TIMEOUT = 2500;
 
 const state = {
     currentSharpness: null,
@@ -22,8 +21,7 @@ const state = {
     currentHighlights: null,
     currentTint: null,
     currentVibrance: null,
-    currentPerformanceMode: false,
-    isInitialized: false
+    currentPerformanceMode: false
 };
 
 function debounce(fn, delay) {
@@ -57,14 +55,26 @@ function ensureSVGContainer() {
 
         container.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" aria-hidden="true" focusable="false" style="position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0.01;pointer-events:none;">
-                <!-- 1. Shadow Boost Filter -->
+                <!-- 1. Chroma-Preserving Shadow Boost Filter -->
                 <filter id="video-enhancer-shadow" color-interpolation-filters="sRGB" x="-10%" y="-10%" width="120%" height="120%">
-                    <feComponentTransfer id="ve-shadow-transfer" in="SourceGraphic" result="shadowLifted">
+                    <!-- Compute Rec.709 Luma -->
+                    <feColorMatrix in="SourceGraphic" type="matrix"
+                        values="0.2126 0.7152 0.0722 0 0
+                                0.2126 0.7152 0.0722 0 0
+                                0.2126 0.7152 0.0722 0 0
+                                0      0      0      1 0"
+                        result="lumaImg"/>
+                    <!-- Apply S-curve shadow lift to Luma -->
+                    <feComponentTransfer in="lumaImg" result="lumaLifted">
                         <feFuncR id="ve-shadow-r" type="identity"/>
                         <feFuncG id="ve-shadow-g" type="identity"/>
                         <feFuncB id="ve-shadow-b" type="identity"/>
                         <feFuncA type="identity"/>
                     </feComponentTransfer>
+                    <!-- delta = lumaLifted - lumaImg -->
+                    <feComposite in="lumaLifted" in2="lumaImg" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0" result="delta"/>
+                    <!-- finalShadow = SourceGraphic + delta (equal lift added to R, G, B preserving hue & saturation) -->
+                    <feComposite in="SourceGraphic" in2="delta" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>
                 </filter>
 
                 <!-- 2. Combined Color & Detail Filter -->
@@ -93,10 +103,20 @@ function ensureSVGContainer() {
                         <feFuncA type="identity"/>
                     </feComponentTransfer>
 
-                    <!-- Sharpness Unsharp Mask -->
+                    <!-- Smart Shadow-Protected Sharpness -->
                     <feGaussianBlur id="ve-sharpness-blur" in="highlightsOut" result="sharpnessBlur" stdDeviation="1.2"/>
+                    <!-- Full unsharp image: sharpFull = (1 + strength) * highlightsOut - strength * sharpnessBlur -->
                     <feComposite id="ve-sharpness-composite" in="highlightsOut" in2="sharpnessBlur" operator="arithmetic"
-                        k1="0" k2="1" k3="0" k4="0" result="finalOut"/>
+                        k1="0" k2="1" k3="0" k4="0" result="sharpFull"/>
+                    <!-- Dual-protected luminance mask: 0 in deep shadows (L < 0.12), 1 in midtones/textures (0.28 <= L <= 0.81), smoothly tapers to 0.15 in extreme highlights (L > 0.84) to eliminate white cloth blooming & spreading -->
+                    <feColorMatrix in="highlightsOut" type="luminanceToAlpha" result="sharpLuma"/>
+                    <feComponentTransfer in="sharpLuma" result="sharpMask">
+                        <feFuncA type="table" tableValues="0 0 0 0 0.0029 0.1307 0.3838 0.6726 0.9077 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0.9595 0.8104 0.6015 0.3863 0.2180 0.1500"/>
+                    </feComponentTransfer>
+                    <!-- Mask sharpFull by sharpMask -->
+                    <feComposite in="sharpFull" in2="sharpMask" operator="in" result="sharpMasked"/>
+                    <!-- Blend masked sharpness over highlightsOut: sharpMasked over highlightsOut = M * sharpFull + (1 - M) * highlightsOut -->
+                    <feComposite in="sharpMasked" in2="highlightsOut" operator="over" result="finalOut"/>
                 </filter>
             </svg>
         `;
@@ -138,7 +158,7 @@ function updateSVGFiltersInPlace(sharpness, warmth, warmthMode = WARMTH_MODE.SIM
         state.currentTint = 0;
         state.currentVibrance = 0;
         state.currentPerformanceMode = true;
-        return { shadowId: null, mainId: null };
+        return { changed: true, shadowId: null, mainId: null };
     }
 
     const normSharpness = clamp(Math.round(sharpness), 0, 100);
@@ -160,31 +180,33 @@ function updateSVGFiltersInPlace(sharpness, warmth, warmthMode = WARMTH_MODE.SIM
         normVibrance === state.currentVibrance &&
         state.currentPerformanceMode === false
     ) {
-        return { shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
+        return { changed: false, shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
     }
 
     ensureSVGContainer();
-    if (!_svgElements) return { shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
+    if (!_svgElements) return { changed: false, shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
 
     const { vMat, wTransferR, wTransferG, wTransferB, wMatrix, hlR, hlG, hlB, comp, sbR, sbG, sbB } = _svgElements;
 
-    // 1. Instant Vibrance Update
+    // 1. Instant Vibrance Update (Perceptual Chroma Gain: protects skin tones & whites, enriches nature & background tones)
     if (vMat && normVibrance !== state.currentVibrance) {
         if (normVibrance <= 0) {
             vMat.setAttribute('values', '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0');
         } else {
             const v = normVibrance / 100;
-            const r1 = 1 + (0.10 * v);
-            const r2 = -0.05 * v;
-            const r3 = -0.05 * v;
+            // Rows sum to 1.0 (strict luminance neutrality, zero shift on pure gray/white).
+            // Restrains red gain (0.25) to protect skin tones from sunburn while expanding nature & sky chrominance (0.35 green, 0.28 blue).
+            const r1 = 1 + (0.25 * v);
+            const r2 = -0.15 * v;
+            const r3 = -0.10 * v;
 
-            const g1 = -0.15 * v;
-            const g2 = 1 + (0.42 * v);
-            const g3 = -0.27 * v;
+            const g1 = -0.12 * v;
+            const g2 = 1 + (0.35 * v);
+            const g3 = -0.23 * v;
 
-            const b1 = -0.18 * v;
-            const b2 = -0.32 * v;
-            const b3 = 1 + (0.50 * v);
+            const b1 = -0.10 * v;
+            const b2 = -0.18 * v;
+            const b3 = 1 + (0.28 * v);
 
             vMat.setAttribute('values', [
                 r1.toFixed(4), r2.toFixed(4), r3.toFixed(4), '0', '0',
@@ -253,23 +275,46 @@ function updateSVGFiltersInPlace(sharpness, warmth, warmthMode = WARMTH_MODE.SIM
         }
     }
 
-    // 3. Instant Highlight Rolloff Update
+    // 3. Instant Highlight Rolloff Update (True Filmic Knee Shoulder)
     if (normHighlights !== state.currentHighlights && hlR) {
         if (normHighlights <= 0) {
-            hlR.setAttribute('type', 'identity');
-            hlG?.setAttribute('type', 'identity');
-            hlB?.setAttribute('type', 'identity');
+            for (const el of [hlR, hlG, hlB]) {
+                if (el) {
+                    el.setAttribute('type', 'identity');
+                    el.removeAttribute('tableValues');
+                    el.removeAttribute('amplitude');
+                    el.removeAttribute('exponent');
+                    el.removeAttribute('offset');
+                }
+            }
         } else {
             const strength = normHighlights / 100;
-            const exponent = (1.0 + strength * 0.35).toFixed(4);
-            const amplitude = (1.0 - strength * 0.08).toFixed(4);
+            // 33-point filmic highlight shoulder curve (steps of 1/32)
+            // Strict 1:1 floor for x <= 0.18 (RGB 0..46): ZERO effect on deep shadows or blacks.
+            // Preserves shadow details and avoids conflicting with Shadow Boost.
+            // Softly compresses upper midtones and bright highlights (x > 0.18) with up to 40% compression at white.
+            const knee = 0.18;
+            const tablePoints = [];
+            for (let i = 0; i <= 32; i++) {
+                const x = i / 32.0;
+                if (x <= knee) {
+                    tablePoints.push(x.toFixed(4));
+                } else {
+                    const t = (x - knee) / (1.0 - knee);
+                    const compression = strength * 0.40 * Math.pow(t, 1.35);
+                    const y = Math.max(x - compression, knee);
+                    tablePoints.push(y.toFixed(4));
+                }
+            }
+            const tableValuesStr = tablePoints.join(' ');
 
             for (const el of [hlR, hlG, hlB]) {
                 if (el) {
-                    el.setAttribute('type', 'gamma');
-                    el.setAttribute('amplitude', amplitude);
-                    el.setAttribute('exponent', exponent);
-                    el.setAttribute('offset', '0');
+                    el.setAttribute('type', 'table');
+                    el.setAttribute('tableValues', tableValuesStr);
+                    el.removeAttribute('amplitude');
+                    el.removeAttribute('exponent');
+                    el.removeAttribute('offset');
                 }
             }
         }
@@ -287,22 +332,45 @@ function updateSVGFiltersInPlace(sharpness, warmth, warmthMode = WARMTH_MODE.SIM
         }
     }
 
-    // 5. Instant Shadow Boost Update
+    // 5. Instant Shadow Boost Update (Chroma-Preserving HDR Luma Lift)
     if (normShadowBoost !== state.currentShadowBoost && sbR) {
         if (normShadowBoost <= 0) {
-            sbR.setAttribute('type', 'identity');
-            sbG?.setAttribute('type', 'identity');
-            sbB?.setAttribute('type', 'identity');
+            for (const el of [sbR, sbG, sbB]) {
+                if (el) {
+                    el.setAttribute('type', 'identity');
+                    el.removeAttribute('tableValues');
+                    el.removeAttribute('amplitude');
+                    el.removeAttribute('exponent');
+                    el.removeAttribute('offset');
+                }
+            }
         } else {
             const strength = normShadowBoost / 100;
-            const exponent = (1.0 - (strength * 0.65)).toFixed(4);
+            // 33-point HDR shadow lift curve (steps of 1/32)
+            // Lifts low-end shadows (RGB 5-60) cleanly above the downstream contrast floor
+            // while preserving true pitch black at x=0 and smoothly tapering to 1:1 in highlights.
+            const tablePoints = [];
+            for (let i = 0; i <= 32; i++) {
+                const x = i / 32.0;
+                if (x <= 0.0) {
+                    tablePoints.push('0.0000');
+                } else if (x >= 1.0) {
+                    tablePoints.push('1.0000');
+                } else {
+                    const lift = Math.sqrt(x) * Math.pow(1.0 - x, 2.0) * 2.3;
+                    const y = Math.min(1.0, x + (strength * 0.55 * lift));
+                    tablePoints.push(y.toFixed(4));
+                }
+            }
+            const tableValuesStr = tablePoints.join(' ');
 
             for (const el of [sbR, sbG, sbB]) {
                 if (el) {
-                    el.setAttribute('type', 'gamma');
-                    el.setAttribute('amplitude', '1.0');
-                    el.setAttribute('exponent', exponent);
-                    el.setAttribute('offset', '0');
+                    el.setAttribute('type', 'table');
+                    el.setAttribute('tableValues', tableValuesStr);
+                    el.removeAttribute('amplitude');
+                    el.removeAttribute('exponent');
+                    el.removeAttribute('offset');
                 }
             }
         }
@@ -317,25 +385,24 @@ function updateSVGFiltersInPlace(sharpness, warmth, warmthMode = WARMTH_MODE.SIM
     state.currentVibrance = normVibrance;
     state.currentPerformanceMode = false;
 
-    return { shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
+    return { changed: true, shadowId: SHADOW_FILTER_ID, mainId: SVG_FILTER_ID };
 }
 
 function buildFilterString(values, performanceMode = false) {
-    const intensity = getNumericValue(values.intensity, 100) / 100;
-    const brightness = 100 + (getNumericValue(values.brightness, 100) - 100) * intensity;
-    const contrast = 100 + (getNumericValue(values.contrast, 100) - 100) * intensity;
-    const baseSaturate = getNumericValue(values.saturate, 100);
-    const vibrance = getNumericValue(values.vibrance, 0) * intensity;
+    const brightness = getNumericValue(values.brightness, 100);
+    const contrast = getNumericValue(values.contrast, 100);
+    const saturate = getNumericValue(values.saturate, 100);
+    const vibrance = getNumericValue(values.vibrance, 0);
     const sharpness = parseInt(values.sharpness ?? 0, 10);
-    const shadowBoost = getNumericValue(values.shadowBoost, 0) * intensity;
-    const highlights = getNumericValue(values.highlights, 0) * intensity;
+    const shadowBoost = getNumericValue(values.shadowBoost, 0);
+    const highlights = getNumericValue(values.highlights, 0);
     const warmthMode = values.warmthMode || 'simple';
 
-    const vibranceSat = (vibrance * 0.35);
-    const saturate = 100 + ((baseSaturate - 100) * intensity) + vibranceSat;
+    // In performanceMode (where SVG vibrance matrix is disabled), provide a lightweight CSS saturation boost fallback
+    const effectiveSaturate = performanceMode ? saturate + (vibrance * 0.30) : saturate;
 
-    const warmth = getNumericValue(values.warmth, 0) * intensity;
-    const tint = getNumericValue(values.tint, 0) * intensity;
+    const warmth = getNumericValue(values.warmth, 0);
+    const tint = getNumericValue(values.tint, 0);
 
     const filters = [];
 
@@ -347,7 +414,7 @@ function buildFilterString(values, performanceMode = false) {
     filters.push(
         `brightness(${brightness.toFixed(2)}%)`,
         `contrast(${contrast.toFixed(2)}%)`,
-        `saturate(${saturate.toFixed(2)}%)`
+        `saturate(${effectiveSaturate.toFixed(2)}%)`
     );
 
     // Instant pure CSS GPU color temperature & tint for zero-latency 60fps response
@@ -371,6 +438,7 @@ function buildFilterString(values, performanceMode = false) {
     const needsSvgDetail = !performanceMode && (
         sharpness > 0 ||
         highlights > 0.5 ||
+        vibrance > 0.5 ||
         (warmthMode === 'cinematic' && Math.abs(warmth) > 0.5)
     );
     if (needsSvgDetail) {
@@ -439,8 +507,13 @@ if (window.top !== window.self) {
     let lastMouseNotify = 0;
     const notifyTopMouse = () => {
         const now = Date.now();
-        if (now - lastMouseNotify > 100) {
+        if (now - lastMouseNotify > 80) {
             lastMouseNotify = now;
+            if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
+                try {
+                    browser.runtime.sendMessage({ type: 'VE_MOUSE_ACTIVITY' }).catch(() => {});
+                } catch (_) {}
+            }
             try {
                 window.top.postMessage({ type: 'VE_MOUSE_ACTIVITY' }, '*');
             } catch (_) {}
@@ -450,7 +523,7 @@ if (window.top !== window.self) {
         }
     };
 
-    ['mousemove', 'pointermove', 'mouseenter', 'pointerenter', 'mouseover', 'pointerover'].forEach(evt => {
+    ['mousemove', 'pointermove', 'mouseenter', 'pointerenter', 'mouseover', 'pointerover', 'mousedown', 'pointerdown', 'touchstart', 'wheel'].forEach(evt => {
         window.addEventListener(evt, notifyTopMouse, { capture: true, passive: true });
         document.addEventListener(evt, notifyTopMouse, { capture: true, passive: true });
     });
@@ -458,6 +531,11 @@ if (window.top !== window.self) {
     // Forward Escape key to top window so tweak panel closes
     const notifyEscape = (e) => {
         if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+            if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
+                try {
+                    browser.runtime.sendMessage({ type: 'VE_ESCAPE_PRESSED' }).catch(() => {});
+                } catch (_) {}
+            }
             try {
                 window.top.postMessage({ type: 'VE_ESCAPE_PRESSED' }, '*');
             } catch (_) {}
@@ -472,6 +550,11 @@ if (window.top !== window.self) {
     // Forward pointerdown/mousedown to top window so tweak panel closes on click outside
     const notifyOutsideClick = (e) => {
         if (e.button === 0) {
+            if (typeof browser !== 'undefined' && browser.runtime?.sendMessage) {
+                try {
+                    browser.runtime.sendMessage({ type: 'VE_CLICK_OUTSIDE' }).catch(() => {});
+                } catch (_) {}
+            }
             try {
                 window.top.postMessage({ type: 'VE_CLICK_OUTSIDE' }, '*');
             } catch (_) {}
@@ -488,7 +571,10 @@ if (window.top !== window.self) {
 
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'VE_MOUSE_ACTIVITY') {
-        hudController?.handleMouseMove?.();
+        if (hudController) {
+            hudController._hasIframeMouseActivity = true;
+            hudController.handleMouseMove();
+        }
         return;
     }
     if (event.data?.type === 'VE_ESCAPE_PRESSED') {
@@ -513,24 +599,39 @@ window.addEventListener('message', (event) => {
 });
 
 function findVideoPlayerIframe() {
-    const iframes = document.querySelectorAll(
-        'iframe#video-player, iframe.video-player, iframe[id*="video-player"], iframe[class*="video-player"], ' +
-        'iframe[src*="youtube.com/embed"], iframe[src*="player.vimeo.com"], iframe[src*="dailymotion.com/embed"], ' +
-        'iframe[src*="flixcloud"], iframe[src*="megacloud"], iframe[src*="rapid-cloud"], ' +
-        'iframe[src*="streamtape"], iframe[src*="vidsrc"]'
-    );
+    const selectors = [
+        'iframe#video-player', 'iframe.video-player', 'iframe[id*="video-player"]', 'iframe[class*="video-player"]',
+        'iframe[id*="player"]', 'iframe[class*="player"]',
+        '#player iframe', '.player iframe', '#video-player iframe', '.video-player iframe',
+        '#player-container iframe', '.player-container iframe', '[data-player] iframe',
+        '.video-wrapper iframe', '#watch-player iframe', '#player-wrapper iframe',
+        'iframe[src*="youtube.com/embed"]', 'iframe[src*="player.vimeo.com"]', 'iframe[src*="dailymotion.com/embed"]',
+        'iframe[src*="flixcloud"]', 'iframe[src*="megacloud"]', 'iframe[src*="rapid-cloud"]',
+        'iframe[src*="streamtape"]', 'iframe[src*="vidsrc"]', 'iframe[src*="vidcloud"]',
+        'iframe[allowfullscreen]', 'iframe[allow*="autoplay"]', 'iframe[allow*="fullscreen"]'
+    ];
+    const iframes = document.querySelectorAll(selectors.join(', '));
     for (let i = 0; i < iframes.length; i++) {
         const frame = iframes[i];
         const rect = frame.getBoundingClientRect();
-        if (rect.width >= 240 && rect.height >= 140) {
+        if ((rect.width >= 240 && rect.height >= 140) || (rect.width === 0 && rect.height === 0)) {
+            return frame;
+        }
+    }
+
+    const allFrames = document.querySelectorAll('iframe');
+    for (let i = 0; i < allFrames.length; i++) {
+        const frame = allFrames[i];
+        const rect = frame.getBoundingClientRect();
+        if (rect.width >= 320 && rect.height >= 180) {
             return frame;
         }
     }
     return null;
 }
 
-function updateVideoStyle(filterValue) {
-    if (filterValue === _cachedVideoFilter) {
+function updateVideoStyle(filterValue, forceRepaint = false) {
+    if (filterValue === _cachedVideoFilter && !forceRepaint) {
         if (!_iframeHasContentScript) {
             const playerIframe = findVideoPlayerIframe();
             if (playerIframe && playerIframe.style.getPropertyValue('filter') !== filterValue) {
@@ -598,7 +699,7 @@ function ensureImageStyleTag() {
     return _imageStyleTag;
 }
 
-function updateImageStyle(enableImages, validated, performanceMode = false) {
+function updateImageStyle(enableImages, validated, performanceMode = false, forceRepaint = false) {
     if (!enableImages) {
         if (_lastEnableImages === false) return;
         _lastEnableImages = false;
@@ -615,7 +716,7 @@ function updateImageStyle(enableImages, validated, performanceMode = false) {
     ensureImageStyleTag();
 
     const imageFilter = buildImageFilterString(validated, performanceMode);
-    if (imageFilter === _cachedImageFilter) return;
+    if (imageFilter === _cachedImageFilter && !forceRepaint) return;
     _cachedImageFilter = imageFilter;
 
     document.documentElement.style.setProperty('--ve-image-filter', imageFilter);
@@ -757,26 +858,23 @@ function applyFilters(data) {
 
         const validated = validatePreset(activeValues, data.activePreset || 'balanced');
 
-        const intensity = getNumericValue(validated.intensity, 100) / 100;
         const sharpness = parseInt(validated.sharpness ?? 0, 10);
-        const warmth = getNumericValue(validated.warmth, 0) * intensity;
-        const tint = getNumericValue(validated.tint, 0) * intensity;
+        const warmth = getNumericValue(validated.warmth, 0);
+        const tint = getNumericValue(validated.tint, 0);
         const warmthMode = validated.warmthMode || 'simple';
-        const shadowBoost = getNumericValue(validated.shadowBoost, 0) * intensity;
-        const highlights = getNumericValue(validated.highlights, 0) * intensity;
-        const vibrance = getNumericValue(validated.vibrance, 0) * intensity;
+        const shadowBoost = getNumericValue(validated.shadowBoost, 0);
+        const highlights = getNumericValue(validated.highlights, 0);
+        const vibrance = getNumericValue(validated.vibrance, 0);
         const performanceMode = data.performanceMode ?? false;
         const enableImages = data.enableImages ?? false;
 
-        updateSVGFiltersInPlace(sharpness, warmth, warmthMode, shadowBoost, highlights, tint, vibrance, performanceMode);
+        const svgResult = updateSVGFiltersInPlace(sharpness, warmth, warmthMode, shadowBoost, highlights, tint, vibrance, performanceMode);
         const filterValue = buildFilterString(validated, performanceMode);
 
-        updateVideoStyle(filterValue);
-        updateImageStyle(enableImages, validated, performanceMode);
+        updateVideoStyle(filterValue, Boolean(svgResult?.changed));
+        updateImageStyle(enableImages, validated, performanceMode, Boolean(svgResult?.changed));
         updateVideoAspect(data.aspectRatio);
         applyAudioEnhancements(data.audioBoost, data.audioCompressor);
-
-        state.isInitialized = true;
     } catch (error) {
         console.error('Video Enhancer Apply Error:', error);
     }
@@ -856,7 +954,7 @@ async function getHostnameAsync() {
 
 function resolveSettings(data, hostname) {
     let resolved = data ? { ...data } : {};
-    resolved.presets = validateAllPresets(data?.presets);
+    resolved.presets = validateAllPresets(data?.presets, data?.presetVersion);
     resolved.activePreset = data?.activePreset || DEFAULT_ACTIVE_PRESET;
     resolved.enabled = data?.enabled !== undefined ? data.enabled : true;
 
@@ -864,7 +962,7 @@ function resolveSettings(data, hostname) {
         resolved = {
             ...resolved,
             ...data.siteSettings[hostname],
-            presets: validateAllPresets(data.siteSettings[hostname].presets || data.presets)
+            presets: validateAllPresets(data.siteSettings[hostname].presets || data.presets, data?.presetVersion)
         };
     }
     resolved.enableImages = (data?.siteSettings?.[hostname]?.enableImages !== undefined)
@@ -874,7 +972,7 @@ function resolveSettings(data, hostname) {
     if (resolved.activePreset === 'warm') {
         resolved.activePreset = 'image';
     }
-    resolved.presets = validateAllPresets(resolved.presets);
+    resolved.presets = validateAllPresets(resolved.presets, data?.presetVersion);
     return resolved;
 }
 
@@ -906,7 +1004,6 @@ class VideoEnhancerHUD {
             presets: deepClone(PRESET_DEFAULTS)
         };
         this.isOpen = false;
-        this.currentSubtab = 'basic';
         this.osdTimer = null;
         this.mouseIdleTimer = null;
         this.isMiniHovered = false;
@@ -1469,7 +1566,7 @@ class VideoEnhancerHUD {
                                 <span class="ve-control-val" id="ve-val-contrast">100%</span>
                             </div>
                         </div>
-                        <input type="range" class="ve-range" id="ve-slider-contrast" min="50" max="200" value="100">
+                        <input type="range" class="ve-range" id="ve-slider-contrast" min="75" max="135" value="100">
                     </div>
 
                     <div class="ve-control-row">
@@ -1496,19 +1593,6 @@ class VideoEnhancerHUD {
                             </div>
                         </div>
                         <input type="range" class="ve-range" id="ve-slider-vibrance" min="0" max="100" value="0">
-                    </div>
-
-                    <div class="ve-control-row">
-                        <div class="ve-control-top">
-                            <span class="ve-control-name"><svg class="ic" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>INTENSITY</span>
-                            <div class="ve-control-val-wrap">
-                                <button type="button" class="ve-btn-slider-reset" data-slider="intensity" title="Reset Intensity to default">
-                                    <svg viewBox="0 0 24 24" class="ve-ic-reset"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                </button>
-                                <span class="ve-control-val" id="ve-val-intensity">100%</span>
-                            </div>
-                        </div>
-                        <input type="range" class="ve-range" id="ve-slider-intensity" min="0" max="100" value="100">
                     </div>
                 </div>
 
@@ -1653,7 +1737,7 @@ class VideoEnhancerHUD {
         });
 
         // Sliders
-        const sliderKeys = ['brightness', 'contrast', 'saturate', 'vibrance', 'intensity', 'shadowBoost', 'highlights', 'sharpness', 'warmth', 'tint'];
+        const sliderKeys = ['brightness', 'contrast', 'saturate', 'vibrance', 'shadowBoost', 'highlights', 'sharpness', 'warmth', 'tint'];
         sliderKeys.forEach((key) => {
             const slider = this.shadow.getElementById(`ve-slider-${key}`);
             if (!slider) return;
@@ -1979,8 +2063,8 @@ class VideoEnhancerHUD {
             }
         }, true);
 
-        // Auto-show Mini HUD on mousemove / pointermove, auto-hide after HUD_IDLE_TIMEOUT idle
-        this.handleMouseMove = () => {
+        // Auto-show Mini HUD on mousemove / pointermove over video player, auto-hide after HUD_IDLE_TIMEOUT idle
+        this.handleMouseMove = (e) => {
             if (!this.isHudEnabled() || this.isOpen) return;
 
             if (!this.hasEligibleContent()) {
@@ -1995,11 +2079,34 @@ class VideoEnhancerHUD {
                 return;
             }
 
+            // Only trigger if cursor is inside the video player boundary or hovering the Mini HUD
+            if (e && typeof e.clientX === 'number' && bounds.isPlayer) {
+                const buffer = 10;
+                const isOverPlayer = (
+                    e.clientX >= (bounds.left - buffer) &&
+                    e.clientX <= (bounds.right + buffer) &&
+                    e.clientY >= (bounds.top - buffer) &&
+                    e.clientY <= (bounds.bottom + buffer)
+                );
+                let isOverMini = Boolean(this.isMiniHovered);
+                if (!isOverMini && this.miniHud) {
+                    const mRect = this.miniHud.getBoundingClientRect();
+                    if (e.clientX >= mRect.left && e.clientX <= mRect.right &&
+                        e.clientY >= mRect.top && e.clientY <= mRect.bottom) {
+                        isOverMini = true;
+                    }
+                }
+                if (!isOverPlayer && !isOverMini) {
+                    return;
+                }
+            }
+
             if (!this.isMounted) {
                 this.mount();
             }
 
             this.applySavedPosition();
+            this.bindPlayerHoverListeners();
 
             if (this.miniHud) {
                 this.miniHud.style.display = '';
@@ -2019,7 +2126,6 @@ class VideoEnhancerHUD {
         window.addEventListener('pointermove', this.handleMouseMove, captureOpts);
         document.addEventListener('mousemove', this.handleMouseMove, captureOpts);
         document.addEventListener('pointermove', this.handleMouseMove, captureOpts);
-        window.addEventListener('focus', this.handleMouseMove, captureOpts);
 
         // Fullscreen change handler to re-mount host into active fullscreen element
         // and maintain proportional HUD position across windowed and fullscreen modes
@@ -2059,12 +2165,11 @@ class VideoEnhancerHUD {
             if ((v.videoWidth >= 160 || v.offsetWidth >= 160) && window.getComputedStyle(v).display !== 'none') {
                 return true;
             }
+            if (rect.width === 0 && rect.height === 0 && window.getComputedStyle(v).display !== 'none' && !v.hidden) {
+                return true;
+            }
         }
         return false;
-    }
-
-    isImageEnhancementEnabled() {
-        return Boolean(this.currentSettings?.enableImages);
     }
 
     isEligiblePage() {
@@ -2079,6 +2184,9 @@ class VideoEnhancerHUD {
     hasEligibleContent() {
         // Child iframes should never mount a HUD - only the top window hosts the HUD
         if (window.top !== window.self) return false;
+
+        // Active iframe player reported mouse activity
+        if (this._hasIframeMouseActivity) return true;
 
         // 1. If this frame contains a real video element, it hosts the HUD directly on the video player
         if (this.hasVideo()) return true;
@@ -2136,6 +2244,10 @@ class VideoEnhancerHUD {
             return;
         }
 
+        if (target.nodeName === 'IFRAME') {
+            target = target.parentElement || document.body || document.documentElement;
+        }
+
         if (this.host.parentElement !== target) {
             target.appendChild(this.host);
         }
@@ -2152,26 +2264,7 @@ class VideoEnhancerHUD {
         this.isMounted = true;
         this.applySavedPosition();
 
-        // Bind hover events to player elements and containers so entering the video wakes up HUD
-        const bindTargetEvents = (el) => {
-            if (!el || el._veMouseBound || typeof this.handleMouseMove !== 'function') return;
-            el._veMouseBound = true;
-            ['pointerenter', 'mouseenter', 'mouseover', 'pointerover', 'pointermove', 'mousemove'].forEach(evt => {
-                el.addEventListener(evt, this.handleMouseMove, { capture: true, passive: true });
-            });
-        };
-
-        bindTargetEvents(document.querySelector('.html5-video-player'));
-        bindTargetEvents(document.querySelector('#movie_player'));
-        bindTargetEvents(document.querySelector('[data-player]'));
-        bindTargetEvents(document.querySelector('video'));
-        bindTargetEvents(document.querySelector('video')?.parentElement);
-        const playerIframe = findVideoPlayerIframe();
-        if (playerIframe) {
-            bindTargetEvents(playerIframe);
-            bindTargetEvents(playerIframe.parentElement);
-            bindTargetEvents(playerIframe.parentElement?.parentElement);
-        }
+        this.bindPlayerHoverListeners();
 
         if (window.top !== window.self && this.hasVideo()) {
             announceIframeActive();
@@ -2188,6 +2281,54 @@ class VideoEnhancerHUD {
             this._playerResizeObserver.observe(playerEl);
             this._observedPlayer = playerEl;
         }
+    }
+
+    bindPlayerHoverListeners() {
+        if (typeof this.handleMouseMove !== 'function') return;
+        const bindTargetEvents = (el) => {
+            if (!el || el._veMouseBound) return;
+            el._veMouseBound = true;
+            ['pointerenter', 'mouseenter', 'mouseover', 'pointerover', 'pointermove', 'mousemove'].forEach(evt => {
+                el.addEventListener(evt, this.handleMouseMove, { capture: true, passive: true });
+            });
+            ['pointerleave', 'mouseleave'].forEach(evt => {
+                el.addEventListener(evt, () => {
+                    if (this.isOpen || this.isMiniHovered) return;
+                    clearTimeout(this.mouseIdleTimer);
+                    this.mouseIdleTimer = setTimeout(() => {
+                        if (!this.isOpen && !this.isMiniHovered) {
+                            this.miniHud?.classList.remove('visible');
+                        }
+                    }, 800);
+                }, { passive: true });
+            });
+        };
+
+        const targets = [
+            this.getVideoPlayerElement(),
+            findVideoPlayerIframe(),
+            document.querySelector('.html5-video-player'),
+            document.querySelector('#movie_player'),
+            document.querySelector('[data-player]'),
+            document.querySelector('#player'),
+            document.querySelector('.player'),
+            document.querySelector('#player-container'),
+            document.querySelector('.player-container'),
+            document.querySelector('#video-player'),
+            document.querySelector('.video-player'),
+            document.querySelector('video')
+        ];
+
+        targets.forEach(el => {
+            if (!el) return;
+            bindTargetEvents(el);
+            if (el.parentElement) {
+                bindTargetEvents(el.parentElement);
+                if (el.parentElement.parentElement) {
+                    bindTargetEvents(el.parentElement.parentElement);
+                }
+            }
+        });
     }
 
     unmount() {
@@ -2250,7 +2391,6 @@ class VideoEnhancerHUD {
         this.updateScopeUI();
         this.renderPresetButtons();
         this.updateSlidersUI();
-        this.flashMiniHud();
     }
 
     updateScopeUI() {
@@ -2306,7 +2446,7 @@ class VideoEnhancerHUD {
         const activeKey = this.currentSettings.activePreset || DEFAULT_ACTIVE_PRESET;
         const vals = this.currentSettings.presets?.[activeKey] || PRESET_DEFAULTS[activeKey] || PRESET_DEFAULTS.balanced;
 
-        const sliderKeys = ['brightness', 'contrast', 'saturate', 'vibrance', 'intensity', 'shadowBoost', 'highlights', 'sharpness', 'warmth', 'tint'];
+        const sliderKeys = ['brightness', 'contrast', 'saturate', 'vibrance', 'shadowBoost', 'highlights', 'sharpness', 'warmth', 'tint'];
         sliderKeys.forEach(key => {
             const slider = this.shadow.getElementById(`ve-slider-${key}`);
             if (slider && vals[key] !== undefined) {
@@ -2505,7 +2645,7 @@ class VideoEnhancerHUD {
                                 document.querySelector('[data-player]');
         if (playerContainer) {
             const rect = playerContainer.getBoundingClientRect();
-            if (rect.width >= 160 && rect.height >= 90) {
+            if ((rect.width >= 160 && rect.height >= 90) || (rect.width === 0 && rect.height === 0)) {
                 return playerContainer;
             }
         }
@@ -2514,7 +2654,7 @@ class VideoEnhancerHUD {
         const iframe = findVideoPlayerIframe();
         if (iframe) {
             const rect = iframe.getBoundingClientRect();
-            if (rect.width >= 160 && rect.height >= 90) {
+            if ((rect.width >= 160 && rect.height >= 90) || (rect.width === 0 && rect.height === 0)) {
                 return iframe;
             }
         }
@@ -2524,7 +2664,7 @@ class VideoEnhancerHUD {
         for (let i = 0; i < videos.length; i++) {
             const v = videos[i];
             const rect = v.getBoundingClientRect();
-            if (rect.width >= 160 && rect.height >= 90) {
+            if ((rect.width >= 160 && rect.height >= 90) || (rect.width === 0 && rect.height === 0)) {
                 const parent = v.parentElement;
                 if (parent) {
                     const pRect = parent.getBoundingClientRect();
@@ -2734,14 +2874,6 @@ class VideoEnhancerHUD {
         }
     }
 
-    resetPanelPosition() {
-        this.resetHudPosition(false);
-    }
-
-    resetMiniHudPosition() {
-        this.resetHudPosition(false);
-    }
-
     updatePositionFromStorage(newPos) {
         if (newPos && typeof newPos.xRatio === 'number' && typeof newPos.yRatio === 'number') {
             this.savedPosition = newPos;
@@ -2855,6 +2987,17 @@ function loadAndApplySettings(source = 'unknown') {
         getHostnameAsync()
     ])
         .then(([data, hostname]) => {
+            if (data?.presetVersion !== '3.6.0') {
+                const upgradedPresets = validateAllPresets(data?.presets, data?.presetVersion);
+                browser.storage.local.set({
+                    presetVersion: '3.6.0',
+                    presets: upgradedPresets
+                }).catch(console.error);
+                if (data) {
+                    data.presetVersion = '3.6.0';
+                    data.presets = upgradedPresets;
+                }
+            }
             const resolved = resolveSettings(data, hostname);
             applyFilters(resolved);
             if (hudController) {
@@ -2894,6 +3037,25 @@ function initStorageListener() {
     });
 
     browser.runtime.onMessage.addListener((message) => {
+        if (message.type === 'VE_MOUSE_ACTIVITY') {
+            if (hudController) {
+                hudController._hasIframeMouseActivity = true;
+                hudController.handleMouseMove();
+            }
+            return;
+        }
+        if (message.type === 'VE_ESCAPE_PRESSED') {
+            if (hudController?.isOpen) {
+                hudController.closeTweakPanel();
+            }
+            return;
+        }
+        if (message.type === 'VE_CLICK_OUTSIDE') {
+            if (hudController?.isOpen) {
+                hudController.closeTweakPanel();
+            }
+            return;
+        }
         if (message.type === 'SET_HUD_ENABLED') {
             hudController?.setHudEnabled(message.enabled);
             return;
@@ -2928,14 +3090,13 @@ function initMutationObserver() {
             for (const node of m.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
                 const hasVid = node.nodeName === 'VIDEO' || Boolean(node.querySelector?.('video'));
-                const hasIframe = node.nodeName === 'IFRAME' || Boolean(node.querySelector?.('iframe#video-player, iframe[src*="flixcloud"], iframe[src*="megacloud"], iframe.video-player, iframe'));
+                const hasIframe = node.nodeName === 'IFRAME' || Boolean(node.querySelector?.('iframe'));
                 if (hasVid || hasIframe) {
                     _cachedVideoFilter = null;
                     debouncedLoadSettings();
-                    if (hudController?.isHudEnabled() && hudController?.hasEligibleContent()) {
-                        hudController.mount();
-                        hudController.flashMiniHud();
-                    }
+                    checkAndAutoMount('mutation');
+                    setTimeout(() => checkAndAutoMount('mutation-reflow-1'), 150);
+                    setTimeout(() => checkAndAutoMount('mutation-reflow-2'), 600);
                     if (window.top !== window.self) {
                         announceIframeActive();
                     }
@@ -2952,6 +3113,16 @@ function initMutationObserver() {
     if (document.body) startObserving();
     else document.addEventListener('DOMContentLoaded', startObserving, { once: true });
     return observer;
+}
+
+function checkAndAutoMount(trigger = 'poll') {
+    if (!hudController?.isHudEnabled()) return;
+    if (hudController.hasEligibleContent()) {
+        if (!hudController.isMounted) {
+            hudController.mount();
+        }
+        hudController.bindPlayerHoverListeners();
+    }
 }
 
 function init() {
@@ -2987,28 +3158,36 @@ function init() {
     window.addEventListener('ve-location-change', () => {
         _cachedVideoFilter = null;
         debouncedLoadSettings();
-        if (hudController?.isHudEnabled() && hudController?.hasEligibleContent()) {
-            hudController.mount();
-            hudController.flashMiniHud();
-        }
+        checkAndAutoMount('ve-location-change');
     });
 
     window.addEventListener('yt-navigate-finish', () => {
         _cachedVideoFilter = null;
         debouncedLoadSettings();
-        if (hudController?.isHudEnabled() && hudController?.hasEligibleContent()) {
-            hudController.mount();
-            hudController.flashMiniHud();
-        }
+        checkAndAutoMount('yt-navigate-finish');
     });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             loadAndApplySettings('DOMContentLoaded');
+            checkAndAutoMount('DOMContentLoaded');
         }, { once: true });
     } else {
-        setTimeout(() => loadAndApplySettings('fallback-timeout'), 0);
+        setTimeout(() => {
+            loadAndApplySettings('fallback-timeout');
+            checkAndAutoMount('fallback-timeout');
+        }, 0);
     }
+
+    window.addEventListener('load', () => {
+        loadAndApplySettings('window-load');
+        checkAndAutoMount('window-load');
+    }, { once: true });
+
+    // Staggered checks for dynamic single-page applications (YouTube, React, Next.js, video players)
+    [250, 600, 1200, 2500, 4000].forEach(delay => {
+        setTimeout(() => checkAndAutoMount(`stagger-${delay}`), delay);
+    });
 }
 
 init();

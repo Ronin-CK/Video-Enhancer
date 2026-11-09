@@ -30,13 +30,18 @@ function updateBadge(enabled, tabId, isSiteOverride = false) {
         color = isSiteOverride ? '#FFC107' : '#4CAF50';
     }
 
+    const actionApi = browser.browserAction || browser.action;
     const details = { text };
     if (tabId) details.tabId = tabId;
-    browser.action.setBadgeText(details);
+    if (actionApi?.setBadgeText) {
+        actionApi.setBadgeText(details);
+    }
 
     const colorDetails = { color };
     if (tabId) colorDetails.tabId = tabId;
-    browser.action.setBadgeBackgroundColor(colorDetails);
+    if (actionApi?.setBadgeBackgroundColor) {
+        actionApi.setBadgeBackgroundColor(colorDetails);
+    }
 }
 
 async function updateBadgeForTab(tabId) {
@@ -109,7 +114,6 @@ browser.commands.onCommand.addListener(async (command) => {
             type: 'UPDATE_SETTINGS',
             settings: {
                 ...stored,
-                enabled: newEnabled,
                 ...(isSiteScope ? stored.siteSettings[hostname] : {}),
                 enabled: newEnabled
             },
@@ -145,6 +149,14 @@ browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
 });
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'VE_MOUSE_ACTIVITY' || message.type === 'VE_ESCAPE_PRESSED' || message.type === 'VE_CLICK_OUTSIDE') {
+        if (sender.tab?.id) {
+            browser.tabs.sendMessage(sender.tab.id, message, { frameId: 0 }).catch(() => {
+                browser.tabs.sendMessage(sender.tab.id, message).catch(() => {});
+            });
+        }
+        return false;
+    }
     if (message.type === 'GET_TAB_HOSTNAME') {
         const hostname = getHostname(sender.tab?.url);
         sendResponse({ hostname });

@@ -1,7 +1,7 @@
 {
-    "manifest_version": 3,
+    "manifest_version": 2,
     "name": "Video Enhancer",
-    "version": "3.4.1",
+    "version": "3.6.0",
     "description": "Enhance video colors with fake HDR effects",
     "browser_specific_settings": {
         "gecko": {
@@ -18,33 +18,22 @@
         }
     },
     "permissions": [
+        "<all_urls>",
         "storage",
-        "activeTab",
         "tabs"
     ],
-    "host_permissions": [
-        "<all_urls>"
-    ],
-    "commands": {
-        "toggle-enhancer": {
-            "suggested_key": {
-                "default": "Alt+Shift+V"
-            },
-            "description": "Toggle Video Enhancer on/off"
-        }
+    "browser_action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "128": "icon.png"
+        },
+        "default_title": "Video Enhancer"
     },
     "background": {
         "scripts": [
             "shared.js",
             "background.js"
         ]
-    },
-    "action": {
-        "default_popup": "popup.html",
-        "default_icon": {
-            "128": "icon.png"
-        },
-        "default_title": "Video Enhancer"
     },
     "content_scripts": [
         {
@@ -57,10 +46,17 @@
             ],
             "run_at": "document_start",
             "all_frames": true,
-            "match_origin_as_fallback": true,
             "match_about_blank": true
         }
     ],
+    "commands": {
+        "toggle-enhancer": {
+            "suggested_key": {
+                "default": "Alt+Shift+V"
+            },
+            "description": "Toggle Video Enhancer on/off"
+        }
+    },
     "icons": {
         "128": "icon.png"
     }

@@ -4,7 +4,7 @@
 
 [![Firefox Add-on](https://img.shields.io/amo/v/video-enhancer?label=Firefox%20Add-on&logo=firefox&logoColor=white&style=for-the-badge)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 
-[![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v3.4.1-4285F4?logo=googlechrome&logoColor=white&style=for-the-badge)](#)
+[![Chrome Extension](https://img.shields.io/badge/Chrome%20Extension-v3.6.0-4285F4?logo=googlechrome&logoColor=white&style=for-the-badge)](#)
 [![Mozilla Add-on Users](https://img.shields.io/amo/users/video-enhancer?style=for-the-badge&logo=firefox&logoColor=white&label=Users)](https://addons.mozilla.org/en-US/firefox/addon/video-enhancer/)
 [![License](https://img.shields.io/badge/License-All_Rights_Reserved-red.svg?style=for-the-badge)](LICENSE)
 
@@ -15,6 +15,18 @@
 ---
 
 </div>
+
+## What's New in v3.6.0
+
+- **Direct 1:1 Pipeline (Intensity Removed)**: Completely eliminated the compounding Intensity multiplier. All 9 visual controls now operate directly with true 1:1 precision.
+- **Anti-Blooming Sharpness Mask**: Upgraded edge convolution with a 33-point luminance protection mask tapering off in extreme highlights ($L = 0.84 \to 1.00$), eliminating white cloth glow and halo artifacts.
+- **Decoupled & Skin-Protected Vibrance**: Vibrance operates independently from standard saturation with dedicated skin-tone and neutral highlight protection.
+- **Highlight Rolloff Engine Overhaul**: Fixed Gecko/Zen browser SVG filter cache invalidation with forced repaint cycles and a calibrated compression knee curve (18% knee, 40% compression, 1.35 power).
+- **Calibrated Contrast Range**: Scaled contrast between 75% and 135% (100% default) to prevent highlight bleaching and dynamic range clipping.
+- **Tuned Anime Default Preset**: Anime profile calibrated for optimal vibrant viewing: Brightness 100%, Contrast 110%, Saturation 130%, Vibrance 20%, Shadow Boost 25%, Highlight Rolloff 10%, Sharpness 16%.
+- **Deep Codebase Optimization**: Pruned all dead methods, unused constants, and legacy state properties across the extension.
+
+---
 
 ## About
 
@@ -40,12 +52,12 @@ Choose from carefully tuned color profiles, or customize their core values.
 
 | Preset             | Best For                                                     |
 | ------------------ | ------------------------------------------------------------ |
-| **Anime**    | Vibrant colors, sharpened edges, and massive shadow recovery |
+| **Anime**    | Vibrant colors, edge clarity, and massive shadow recovery    |
 | **Balanced** | Everyday viewing with natural colors                         |
 | **Vivid**    | Punchy, highly saturated content                             |
 | **Cinema**   | Film-like depth, warm tones, and cinematic contrast          |
 | **Gaming**   | High visibility and bold saturation                          |
-| **Warm**     | Comfortable, eye-friendly tones                              |
+| **Image**    | High-clarity photo, thumbnail, and illustration enhancement  |
 
 *(Right-click any preset button to rename it, or hit "+" to create your own custom presets!)*
 
@@ -55,11 +67,10 @@ Fine-tune your viewing experience using our custom dual-stage filter pipeline:
 
 - **Shadow Boost** — Recovers crushed details in dark areas with a pure black anchor to avoid milky blacks
 - **Highlight Rolloff** — Smooth anti-clipping protection preventing blown-out whites in bright scenes
-- **Brightness & Contrast** — Control overall luminance and separation
-- **Saturation & Vibrance** — Boost color intensity while protecting natural skin tones
-- **Warmth & Tint** — 2-axis color grading: Temperature (Cool ↔ Warm) and Tint (Green ↔ Magenta)
-- **Sharpness** — Enhance edge clarity via custom SVG convolution matrices
-- **Intensity** — Scale the overall effect strength from 0% to 100%
+- **Brightness & Contrast** — Calibrated luminance and separation controls (contrast range tuned 75%–135% to protect dynamic range)
+- **Saturation & Vibrance** — Decoupled chrominance boost with skin-tone protection and neutral highlight safeguarding
+- **Warmth & Tint** — 2-axis color grading: Temperature (Cool ↔ Warm) with Simple or Cinematic split-toning, and Tint (Green ↔ Magenta)
+- **Sharpness** — Enhanced edge clarity via custom SVG convolution matrices featuring a 33-point luminance protection mask to prevent white cloth blooming and halo artifacts
 
 ### Playback & Utility Tools
 

@@ -15,12 +15,12 @@ const WARMTH_MODE = {
 };
 
 const PRESET_DEFAULTS = {
-    anime: { brightness: 104, contrast: 114, saturate: 136, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 75, sharpness: 16, shadowBoost: 30, highlights: 18, tint: 0, vibrance: 20 },
-    balanced: { brightness: 102, contrast: 112, saturate: 115, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 65, sharpness: 6, shadowBoost: 15, highlights: 12, tint: 0, vibrance: 12 },
-    vivid: { brightness: 106, contrast: 124, saturate: 135, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, intensity: 80, sharpness: 14, shadowBoost: 10, highlights: 22, tint: 0, vibrance: 25 },
-    cinema: { brightness: 100, contrast: 118, saturate: 106, warmth: 12, warmthMode: WARMTH_MODE.CINEMATIC, intensity: 70, sharpness: 0, shadowBoost: 22, highlights: 30, tint: -2, vibrance: 8 },
-    gaming: { brightness: 108, contrast: 126, saturate: 125, warmth: -6, warmthMode: WARMTH_MODE.SIMPLE, intensity: 85, sharpness: 24, shadowBoost: 45, highlights: 15, tint: 0, vibrance: 16 },
-    image: { brightness: 102, contrast: 120, saturate: 130, warmth: 2, warmthMode: WARMTH_MODE.SIMPLE, intensity: 80, sharpness: 32, shadowBoost: 40, highlights: 28, tint: 0, vibrance: 22 }
+    anime: { brightness: 100, contrast: 110, saturate: 130, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 16, shadowBoost: 25, highlights: 10, tint: 0, vibrance: 20 },
+    balanced: { brightness: 101, contrast: 107, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 8, shadowBoost: 14, highlights: 14, tint: 0, vibrance: 12 },
+    vivid: { brightness: 103, contrast: 115, saturate: 122, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 18, shadowBoost: 18, highlights: 24, tint: 0, vibrance: 20 },
+    cinema: { brightness: 100, contrast: 112, saturate: 106, warmth: 7, warmthMode: WARMTH_MODE.CINEMATIC, sharpness: 0, shadowBoost: 18, highlights: 28, tint: -2, vibrance: 8 },
+    gaming: { brightness: 104, contrast: 115, saturate: 116, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 20, shadowBoost: 38, highlights: 20, tint: 0, vibrance: 18 },
+    image: { brightness: 102, contrast: 112, saturate: 114, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 24, shadowBoost: 28, highlights: 25, tint: 0, vibrance: 16 }
 };
 
 const DEFAULT_PRESET_NAMES = {
@@ -32,17 +32,15 @@ const DEFAULT_PRESET_NAMES = {
     image: 'Image'
 };
 
-const SLIDER_KEYS = ['brightness', 'contrast', 'saturate', 'warmth', 'intensity', 'sharpness', 'shadowBoost', 'highlights', 'tint', 'vibrance'];
+const SLIDER_KEYS = ['brightness', 'contrast', 'saturate', 'warmth', 'sharpness', 'shadowBoost', 'highlights', 'tint', 'vibrance'];
 const SELECT_KEYS = ['warmthMode'];
-const ALL_SETTING_KEYS = [...SLIDER_KEYS, ...SELECT_KEYS];
 const DEFAULT_ACTIVE_PRESET = 'balanced';
 
 const SLIDER_RANGES = {
     brightness: { min: 50, max: 150, def: 100 },
-    contrast: { min: 50, max: 200, def: 100 },
+    contrast: { min: 75, max: 135, def: 100 },
     saturate: { min: 50, max: 200, def: 100 },
     warmth: { min: -30, max: 30, def: 0 },
-    intensity: { min: 0, max: 100, def: 100 },
     sharpness: { min: 0, max: 100, def: 0 },
     shadowBoost: { min: 0, max: 100, def: 0 },
     highlights: { min: 0, max: 100, def: 0 },
@@ -81,10 +79,15 @@ function validatePreset(preset, fallbackKey) {
     return cleaned;
 }
 
-function validateAllPresets(presets) {
+function validateAllPresets(presets, presetVersion) {
+    const isUpgraded = presetVersion === '3.6.0';
     const result = {};
     for (const key of Object.keys(PRESET_DEFAULTS)) {
-        result[key] = validatePreset(presets?.[key], key);
+        if (!isUpgraded) {
+            result[key] = deepClone(PRESET_DEFAULTS[key]);
+        } else {
+            result[key] = validatePreset(presets?.[key], key);
+        }
     }
     if (presets && typeof presets === 'object') {
         for (const [key, val] of Object.entries(presets)) {
@@ -102,6 +105,7 @@ const STORAGE_KEYS = [
     'enabled',
     'activePreset',
     'presets',
+    'presetVersion',
     'siteSettings',
     'enableImages',
     'presetNames',

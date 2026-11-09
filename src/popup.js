@@ -118,8 +118,7 @@ async function loadState() {
             aspectRatio: state.aspectRatio,
             audioBoost: state.audioBoost,
             audioCompressor: state.audioCompressor,
-            enableHud: state.enableHud,
-            hudFullscreenOnly: state.hudFullscreenOnly
+            enableHud: state.enableHud
         };
 
         if (hostname && state.siteSettings[hostname]) {
@@ -143,7 +142,6 @@ async function loadState() {
         state.enabled = true;
         state.enableImages = false;
         state.enableHud = true;
-        state.hudFullscreenOnly = false;
         currentPresetName = DEFAULT_ACTIVE_PRESET;
         state.presets = deepClone(PRESET_DEFAULTS);
     }
@@ -157,7 +155,6 @@ function loadSettingsFromData(data) {
     state.audioBoost = parseInt(data.audioBoost || 100, 10);
     state.audioCompressor = data.audioCompressor ?? false;
     state.enableHud = data.enableHud ?? true;
-    state.hudFullscreenOnly = data.hudFullscreenOnly ?? false;
 
     if (data.activePreset === 'warm') {
         currentPresetName = 'image';
@@ -165,8 +162,14 @@ function loadSettingsFromData(data) {
         currentPresetName = data.activePreset || DEFAULT_ACTIVE_PRESET;
     }
 
-    if (data.presets) {
-        state.presets = validateAllPresets(data.presets);
+    if (data.presetVersion !== '3.6.0') {
+        state.presets = validateAllPresets(data.presets, data.presetVersion);
+        browser.storage.local.set({
+            presetVersion: '3.6.0',
+            presets: state.presets
+        }).catch(console.error);
+    } else if (data.presets) {
+        state.presets = validateAllPresets(data.presets, data.presetVersion);
     } else {
         state.presets = deepClone(PRESET_DEFAULTS);
     }
@@ -182,13 +185,13 @@ function saveState() {
         enableImages: state.enableImages,
         activePreset: currentPresetName,
         presets: state.presets,
+        presetVersion: '3.6.0',
         performanceMode: state.performanceMode,
         aspectRatio: state.aspectRatio,
         audioBoost: state.audioBoost,
         audioCompressor: state.audioCompressor,
         presetNames: state.presetNames,
-        enableHud: state.enableHud ?? true,
-        hudFullscreenOnly: state.hudFullscreenOnly ?? false
+        enableHud: state.enableHud ?? true
     };
 
     if (currentScope === 'global') {
@@ -732,8 +735,7 @@ function broadcastChanges() {
             aspectRatio: state.aspectRatio,
             audioBoost: state.audioBoost,
             audioCompressor: state.audioCompressor,
-            enableHud: state.enableHud ?? true,
-            hudFullscreenOnly: state.hudFullscreenOnly ?? false
+            enableHud: state.enableHud ?? true
         },
         ignoreStorage: true
     };
