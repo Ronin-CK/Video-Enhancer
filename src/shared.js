@@ -16,7 +16,7 @@ const WARMTH_MODE = {
 
 const PRESET_DEFAULTS = {
     anime: { brightness: 100, contrast: 110, saturate: 130, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 16, shadowBoost: 25, highlights: 10, tint: 0, vibrance: 20 },
-    balanced: { brightness: 101, contrast: 107, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 8, shadowBoost: 14, highlights: 14, tint: 0, vibrance: 12 },
+    balanced: { brightness: 101, contrast: 107, saturate: 110, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 0, shadowBoost: 14, highlights: 14, tint: 0, vibrance: 12 },
     vivid: { brightness: 103, contrast: 115, saturate: 122, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 18, shadowBoost: 18, highlights: 24, tint: 0, vibrance: 20 },
     cinema: { brightness: 100, contrast: 112, saturate: 106, warmth: 7, warmthMode: WARMTH_MODE.CINEMATIC, sharpness: 0, shadowBoost: 18, highlights: 28, tint: -2, vibrance: 8 },
     gaming: { brightness: 104, contrast: 115, saturate: 116, warmth: 0, warmthMode: WARMTH_MODE.SIMPLE, sharpness: 20, shadowBoost: 38, highlights: 20, tint: 0, vibrance: 18 },
@@ -56,6 +56,24 @@ function deepClone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 
+const PERFORMANCE_DEFAULT_HOSTS = [
+    'youtube.com',
+    'youtube-nocookie.com',
+    'youtu.be',
+    'twitch.tv',
+    'kick.com'
+];
+
+function isPerformanceDefaultHost(hostname) {
+    if (!hostname) return false;
+    const h = String(hostname).toLowerCase().replace(/^www\./, '');
+    return PERFORMANCE_DEFAULT_HOSTS.some(host => h === host || h.endsWith('.' + host));
+}
+
+function isYouTubeHost(hostname) {
+    return isPerformanceDefaultHost(hostname);
+}
+
 function validatePreset(preset, fallbackKey) {
     const factory = PRESET_DEFAULTS[fallbackKey] || PRESET_DEFAULTS.balanced;
     const cleaned = { ...factory };
@@ -66,6 +84,10 @@ function validatePreset(preset, fallbackKey) {
         cleaned[key] = Number.isFinite(raw)
             ? clamp(Math.round(raw), range.min, range.max)
             : (factory[key] !== undefined ? factory[key] : (range?.def ?? 0));
+    }
+
+    if (fallbackKey === 'balanced' && preset?.sharpness === 8) {
+        cleaned.sharpness = 0;
     }
 
     cleaned.warmthMode = Object.values(WARMTH_MODE).includes(preset?.warmthMode)
@@ -79,8 +101,8 @@ function validatePreset(preset, fallbackKey) {
     return cleaned;
 }
 
-function validateAllPresets(presets, presetVersion) {
-    const isUpgraded = presetVersion === '3.6.0';
+function validateAllPresets(presets, presetVersion = '3.6.3') {
+    const isUpgraded = presetVersion === '3.6.0' || presetVersion === '3.6.1' || presetVersion === '3.6.2' || presetVersion === '3.6.3';
     const result = {};
     for (const key of Object.keys(PRESET_DEFAULTS)) {
         if (!isUpgraded) {
