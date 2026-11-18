@@ -149,7 +149,7 @@ browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
 });
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'VE_MOUSE_ACTIVITY' || message.type === 'VE_ESCAPE_PRESSED' || message.type === 'VE_CLICK_OUTSIDE') {
+    if (message.type === 'VE_MOUSE_ACTIVITY' || message.type === 'VE_ESCAPE_PRESSED' || message.type === 'VE_CLICK_OUTSIDE' || message.type === 'VE_TOGGLE_HUD' || message.type === 'VE_CYCLE_PRESET') {
         if (sender.tab?.id) {
             browser.tabs.sendMessage(sender.tab.id, message, { frameId: 0 }).catch(() => {
                 browser.tabs.sendMessage(sender.tab.id, message).catch(() => {});

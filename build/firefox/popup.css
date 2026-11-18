@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026 Chandra Kant (Ronin-CK)
  * All Rights Reserved.
- * Tactical Flat Neo-Anime UI Style
  */
 
 body.preload * {
@@ -732,4 +731,17 @@ input[type="range"]::-moz-range-progress {
     padding: 1px 4px;
     color: #ffffff;
     font-family: inherit;
+}
+
+/* Performance Mode Bypassed Sliders */
+.control-row.disabled-perf {
+    opacity: 0.42;
+}
+
+.control-row.disabled-perf input[type="range"] {
+    cursor: not-allowed;
+}
+
+.control-row.disabled-perf .btn-slider-reset {
+    pointer-events: none;
 }
