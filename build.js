@@ -45,41 +45,8 @@ function build() {
         "service_worker": "background_loader.js"
     };
 
-    const firefoxPermissions = Array.from(new Set([
-        '<all_urls>',
-        ...(baseManifest.permissions || []).filter(p => p !== 'activeTab')
-    ]));
-
-    const firefoxContentScripts = (baseManifest.content_scripts || []).map(cs => ({
-        matches: cs.matches,
-        js: cs.js,
-        run_at: cs.run_at || 'document_start',
-        all_frames: cs.all_frames ?? true,
-        match_about_blank: cs.match_about_blank ?? true
-    }));
-
-    const firefoxManifest = {
-        manifest_version: 2,
-        name: baseManifest.name,
-        version: baseManifest.version,
-        description: baseManifest.description,
-        browser_specific_settings: baseManifest.browser_specific_settings,
-        permissions: firefoxPermissions,
-        browser_action: {
-            default_popup: baseManifest.action?.default_popup || 'popup.html',
-            default_icon: baseManifest.action?.default_icon || { '128': 'icon.png' },
-            default_title: baseManifest.action?.default_title || 'Video Enhancer'
-        },
-        background: {
-            scripts: [
-                'shared.js',
-                'background.js'
-            ]
-        },
-        content_scripts: firefoxContentScripts,
-        commands: baseManifest.commands,
-        icons: baseManifest.icons
-    };
+    // Firefox build: MV3 with Gecko ID and background scripts matching src/manifest.json
+    const firefoxManifest = { ...baseManifest };
 
     fs.writeFileSync(
         path.join(CHROME_DIR, 'manifest.json'), 
