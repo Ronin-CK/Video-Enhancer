@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026 Chandra Kant (Ronin-CK)
  * All Rights Reserved.
- * Tactical Flat Neo-Anime Logic
  */
 
 let currentPresetName = DEFAULT_ACTIVE_PRESET;
@@ -107,6 +106,18 @@ async function loadState() {
         state.themeColor = stored.themeColor || '#ff9800';
         applyThemeColor(state.themeColor, false);
 
+        if (stored.presetVersion !== '3.6.0' && stored.presetVersion !== '3.6.1' && stored.presetVersion !== '3.6.2' && stored.presetVersion !== '3.6.3') {
+            stored.presets = validateAllPresets(stored.presets, stored.presetVersion);
+            stored.presetVersion = '3.6.3';
+            browser.storage.local.set({
+                presetVersion: '3.6.3',
+                presets: stored.presets
+            }).catch(console.error);
+        } else if (stored.presetVersion !== '3.6.3') {
+            stored.presetVersion = '3.6.3';
+            browser.storage.local.set({ presetVersion: '3.6.3' }).catch(console.error);
+        }
+
         loadSettingsFromData(stored);
 
         state.globalSettings = {
@@ -114,6 +125,7 @@ async function loadState() {
             enableImages: state.enableImages,
             activePreset: currentPresetName,
             presets: deepClone(state.presets),
+            presetVersion: '3.6.3',
             performanceMode: state.performanceMode,
             aspectRatio: state.aspectRatio,
             audioBoost: state.audioBoost,
@@ -128,6 +140,13 @@ async function loadState() {
             if (state.siteSettings[hostname].enableImages === undefined) {
                 state.enableImages = globalEnableImages;
             }
+            if (state.siteSettings[hostname].performanceMode === undefined && isPerformanceDefaultHost(hostname)) {
+                state.performanceMode = true;
+            }
+        } else if (isPerformanceDefaultHost(hostname)) {
+            // Default 60fps/live platforms (YouTube, Twitch, Kick) to site scope with Performance Mode enabled out-of-the-box
+            currentScope = 'site';
+            state.performanceMode = true;
         }
 
         const siteLabel = document.getElementById('tab-site-label');
@@ -162,14 +181,8 @@ function loadSettingsFromData(data) {
         currentPresetName = data.activePreset || DEFAULT_ACTIVE_PRESET;
     }
 
-    if (data.presetVersion !== '3.6.0') {
-        state.presets = validateAllPresets(data.presets, data.presetVersion);
-        browser.storage.local.set({
-            presetVersion: '3.6.0',
-            presets: state.presets
-        }).catch(console.error);
-    } else if (data.presets) {
-        state.presets = validateAllPresets(data.presets, data.presetVersion);
+    if (data.presets) {
+        state.presets = validateAllPresets(data.presets, data.presetVersion || '3.6.3');
     } else {
         state.presets = deepClone(PRESET_DEFAULTS);
     }
@@ -185,7 +198,7 @@ function saveState() {
         enableImages: state.enableImages,
         activePreset: currentPresetName,
         presets: state.presets,
-        presetVersion: '3.6.0',
+        presetVersion: '3.6.3',
         performanceMode: state.performanceMode,
         aspectRatio: state.aspectRatio,
         audioBoost: state.audioBoost,
@@ -223,8 +236,14 @@ function switchScope(newScope) {
             if (siteData.enableImages === undefined) {
                 state.enableImages = currentImgSetting;
             }
+            if (siteData.performanceMode === undefined && isPerformanceDefaultHost(state.hostname)) {
+                state.performanceMode = true;
+            }
         } else if (state.globalSettings) {
             loadSettingsFromData(state.globalSettings);
+            if (isPerformanceDefaultHost(state.hostname)) {
+                state.performanceMode = true;
+            }
         }
     } else {
         if (state.globalSettings) {
@@ -245,6 +264,9 @@ function resetSiteOverride() {
 
         if (state.globalSettings) {
             loadSettingsFromData(state.globalSettings);
+            if (isPerformanceDefaultHost(state.hostname)) {
+                state.performanceMode = true;
+            }
         }
         updateAllUI();
         broadcastChanges();
@@ -395,6 +417,7 @@ function handleResetActivePreset() {
 function updateSlidersUI() {
     const vals = state.presets[currentPresetName];
     if (!vals) return;
+    const isPerf = Boolean(state.performanceMode);
 
     SLIDER_KEYS.forEach(key => {
         const slider = document.getElementById(key);
@@ -404,6 +427,17 @@ function updateSlidersUI() {
             slider.value = value;
             updateValueDisplay(key, value, document.getElementById(`${key}-value`));
             updateSliderFill(slider);
+
+            if (key === 'shadowBoost' || key === 'highlights' || key === 'sharpness') {
+                const row = slider.closest('.control-row');
+                const resetBtn = row?.querySelector('.btn-slider-reset');
+                if (row) {
+                    row.classList.toggle('disabled-perf', isPerf);
+                    row.title = isPerf ? 'Bypassed in Performance Mode' : '';
+                }
+                slider.disabled = isPerf;
+                if (resetBtn) resetBtn.disabled = isPerf;
+            }
         }
     });
 }
@@ -512,6 +546,7 @@ function toggleImagesEnabled(e) {
 
 function togglePerformanceMode(e) {
     state.performanceMode = e.target.checked;
+    updateSlidersUI();
     saveState();
     broadcastChanges();
     showToast(state.performanceMode ? 'PERFORMANCE MODE ON' : 'QUALITY MODE ON');
@@ -731,6 +766,7 @@ function broadcastChanges() {
             enableImages: state.enableImages,
             activePreset: currentPresetName,
             presets: state.presets,
+            presetVersion: '3.6.3',
             performanceMode: state.performanceMode,
             aspectRatio: state.aspectRatio,
             audioBoost: state.audioBoost,
@@ -812,8 +848,9 @@ function importSettings() {
             const data = JSON.parse(text);
 
             if (data.presets) {
-                data.presets = validateAllPresets(data.presets);
+                data.presets = validateAllPresets(data.presets, data.presetVersion || '3.6.3');
             }
+            data.presetVersion = '3.6.3';
             if (data.presetNames) {
                 const cleaned = {};
                 for (const [k, v] of Object.entries(data.presetNames)) {
@@ -842,16 +879,18 @@ function importSettings() {
     input.click();
 }
 
+let toastTimeout = null;
 function showToast(message) {
     let toast = document.getElementById('toast');
     if (!toast) return;
 
+    clearTimeout(toastTimeout);
     toast.textContent = '';
     const span = document.createElement('span');
     span.textContent = message;
     toast.appendChild(span);
     toast.classList.add('visible');
-    setTimeout(() => toast.classList.remove('visible'), 2000);
+    toastTimeout = setTimeout(() => toast.classList.remove('visible'), 2000);
 }
 
 function getContrastColor(hexColor) {
